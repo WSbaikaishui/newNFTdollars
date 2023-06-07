@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.8;
 
-import "../dependencies/IERC20.sol";
-import "../dependencies/IERC2612.sol";
-
-interface INDLToken is IERC20, IERC2612 {
+//import "../dependencies/IERC2612.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+interface INDLToken  {
 
   // --- Events ---
 
@@ -17,7 +16,4 @@ interface INDLToken is IERC20, IERC2612 {
 
   function sendToNDLStaking(address _sender, uint256 _amount) external;
 
-  function getDeploymentStartTime() external view returns (uint256);
-
-  function getLpRewardsEntitlement() external view returns (uint256);
 }

@@ -15,5 +15,5 @@ npx hardhat help
 npx hardhat test test/sample-test.js   //as you want 
 REPORT_GAS=true npx hardhat test
 npx hardhat node
-npx hardhat run scripts/deploy.js
+npx hardhat run scripts/05-deploy-LoanPool.js
 ```

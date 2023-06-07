@@ -21,7 +21,7 @@ describe("NDL", function () {
         console.log("initialize success: " + ndlName);
 
         //设置pool地址为addr1
-        await hardhatToken.connect( owner).initializePool(await addr1.getAddress());
+        await hardhatToken.connect(owner).initializePool(await addr1.getAddress());
         //
         // console.log("initializePool success: " + await hardhatToken.owner);
         //addr1调用合约给自己mint 100000代币

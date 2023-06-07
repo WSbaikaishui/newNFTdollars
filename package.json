@@ -23,6 +23,7 @@
     "@openzeppelin/contracts": "^4.9.0",
     "@openzeppelin/contracts-upgradeable": "^4.9.0",
     "dotenv": "^16.1.1",
-    "hardhat-deploy": "^0.11.30"
+    "hardhat-deploy": "^0.11.30",
+    "mocha": "^10.2.0"
   }
 }

@@ -7,12 +7,10 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20Pe
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-//import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgrade;
-//import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
-//import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
-//import "@openzeppelin/contracts/access/Ownable.sol";
+import "../interfaces/INDLToken.sol";
 
 contract NDLToken is
+INDLToken,
   Initializable,
   ERC20Upgradeable,
   OwnableUpgradeable,
@@ -59,6 +57,9 @@ contract NDLToken is
   }
   function mint(address to, uint256 amount) public onlyPool {
     _mint(to, amount);
+  }
+  function sendToNDLStaking(address _sender, uint256 _amount) external onlyPool{
+    _transfer(_sender, _pool, _amount);
   }
 
 

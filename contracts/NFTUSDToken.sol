@@ -2,16 +2,14 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity 0.8.8;
 
-
-
+import "./interfaces/INFTUSDToken.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-
-contract NFTUSDToken is ERC20, ERC20Permit,  Ownable {
+contract NFTUSDToken is INFTUSDToken , ERC20, ERC20Permit, Ownable{
     address private _pool;
+
     constructor() ERC20("NFTUSDToken", "NFTUSD") ERC20Permit("NFTUSDToken") {}
 
 
@@ -33,6 +31,7 @@ contract NFTUSDToken is ERC20, ERC20Permit,  Ownable {
     override(ERC20)
     {
         super._afterTokenTransfer(from, to, amount);
+        emit BalanceTransfer(from, to, amount);
     }
 
     function _mint(address to, uint256 amount)
@@ -51,13 +50,24 @@ contract NFTUSDToken is ERC20, ERC20Permit,  Ownable {
 
 
     //function mint onlyOwner
-    function mint(address to, uint256 amount) public onlyPool {
-        _mint(to, amount);
+    function mint(address user, uint256 amount) public  onlyPool {
+        _mint(user, amount);
+        emit Mint(user, amount);
     }
 
     //function burn onlyOwner
-    function burn(address from, uint256 amount) public onlyPool{
-        _burn(from, amount);
+    function burn(address user, uint256 amount) public onlyPool{
+        _burn(user, amount);
+        emit Burn(user, amount);
+    }
+    function sendToPool(address _sender,  address _poolAddress, uint256 _amount) external override onlyPool {
+
+        _transfer(_sender, _poolAddress, _amount);
+    }
+
+    function returnFromPool(address _poolAddress, address _receiver, uint256 _amount) external override onlyPool{
+
+        _transfer(_poolAddress, _receiver, _amount);
     }
 }
     //    /**

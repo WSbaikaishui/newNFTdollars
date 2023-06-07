@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: agpl-3.0
-pragma solidity 0.8.4;
+pragma solidity 0.8.8;
 
 library DataTypes {
     struct ReserveData {
@@ -62,15 +62,7 @@ struct LoanData {
     //bidder address of first bid
     address liquityAddress;
   }
-struct NftData {
-   
-    //address of the bNFT contract
-    address Address;
-    //the id of the nft. Represents the position in the list of the active nfts
-    uint8 id;
-    uint256 maxSupply;
-    uint256 maxTokenId;
-  }
+
 
 
 }

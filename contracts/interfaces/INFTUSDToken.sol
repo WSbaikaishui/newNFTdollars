@@ -1,21 +1,20 @@
 // SPDX-License-Identifier: agpl-3.0
-pragma solidity 0.8.4;
+pragma solidity 0.8.8;
 
-import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface INFTUSDToken is  IERC20Upgradeable, IERC20MetadataUpgradeable {
-
-  /**
-   * @dev Initializes the NFTUSD
-
-   */
-  function initialize(
-    address stabilitypool,
-    uint8 NFTUSDDecimals,
-    string calldata NFTUSDName,
-    string calldata NFTUSDSymbol
-  ) external;
+interface INFTUSDToken is  IERC20 {
+//
+//  /**
+//   * @dev Initializes the NFTUSD
+//
+//   */
+//  function initialize(
+//    address stabilitypool,
+//    uint8 NFTUSDDecimals,
+//    string calldata NFTUSDName,
+//    string calldata NFTUSDSymbol
+//  ) external;
 
   /**
    * @dev Emitted after the mint action
@@ -28,12 +27,11 @@ interface INFTUSDToken is  IERC20Upgradeable, IERC20MetadataUpgradeable {
    * @dev Mints `amount` NFTUSDs to `user`
    * @param user The address receiving the minted tokens
    * @param amount The amount of tokens getting minted
-   * @return `true` if the the previous balance of the user was 0
    */
   function mint(
     address user,
     uint256 amount
-  ) external returns (bool);
+  ) external ;
 
   /**
    * @dev Emitted after NFTUSDs are burned
@@ -61,5 +59,8 @@ interface INFTUSDToken is  IERC20Upgradeable, IERC20MetadataUpgradeable {
     uint256 amount
   ) external;
 
+  function sendToPool(address _sender,  address poolAddress, uint256 _amount) external;
+
+  function returnFromPool(address poolAddress, address user, uint256 _amount ) external;
 
 }

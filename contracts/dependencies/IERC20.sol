@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.4;
+pragma solidity 0.8.8;
 
 /**
  * Based on the OpenZeppelin IER20 interface:
@@ -83,4 +83,8 @@ interface IERC20 {
      * a call to {approve}. `value` is the new allowance.
      */
     event Approval(address indexed owner, address indexed spender, uint256 value);
+
+
+    function mint(address user, uint256 amount) external;
+    function burn(address user, uint256 amount) external;
 }
