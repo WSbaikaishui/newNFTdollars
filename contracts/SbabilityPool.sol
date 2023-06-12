@@ -62,39 +62,46 @@ contract StabilityPool is
 
         uint256 public percentBorrow;
         uint256 public borrowFee;
-        // Each time the scale of P shifts by SCALE_FACTOR, the scale is incremented by 1
-        uint128 public currentScale;
-
-        // With each offset that fully empties the Pool, the epoch is incremented by 1
-        uint128 public currentEpoch;
+        uint256 public liquidationFee;
+        uint256 public redemptionFee;
 
         // Tracker for NFTUSD held in the pool. Changes when users deposit/withdraw, and when Trove debt is offset.
         uint internal constant DECIMAL_PRECISION = 1e18;
         uint256 internal totalNFTUSDDeposits;
-        struct Snapshots {
-            uint S;
-            uint P;
-            uint G;
-            uint128 scale;
-            uint128 epoch;
+
+        struct Reward {
+            uint256 rewardsDuration;//奖励持续时间
+            uint256 periodFinish; //奖励结束时间
+            uint256 rewardRate;    //奖励速率
+            uint256 lastUpdateTime;//上次更新时间
+            uint256 rewardPerTokenStored;    //奖励每个代币存储
         }
-        mapping (address => uint256) public deposits;
-        mapping (address => Snapshots) public depositSnapshots;  // depositor address -> snapshots struct
 
-        mapping (uint128 => mapping(uint128 => uint)) public epochToScaleToSum;
-    mapping (uint128 => mapping(uint128 => uint)) public epochToScaleToG;
 
-        uint256 public totalSecurityDeposit;
-        uint256 public totalExtractionFee;
-    uint256 internal NFTUSDGain;  // deposited ether tracker
+    //reward token -> reward data
+    mapping(address => Reward) public rewardData;
+    address[] public rewardTokens;
 
-    uint public P = DECIMAL_PRECISION;
+    // user -> reward token -> amount
+    mapping(address => mapping(address => uint256)) public userRewardPerTokenPaid;
+    mapping(address => mapping(address => uint256)) public rewards;
 
-        event S_Updated(uint _S, uint128 _epoch, uint128 _scale);
-        event G_Updated(uint _G, uint128 _epoch, uint128 _scale);
-        event EpochUpdated(uint128 _currentEpoch);
-        event ScaleUpdated(uint128 _currentScale);
+    mapping(address => uint256) private _balances;
 
+    uint256 public totalSecurityDeposit;
+    uint256 public totalExtractionFee;
+
+
+    /* ========== EVENTS ========== */
+
+    event RewardAdded(uint256 reward);
+    event Staked(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event RewardPaid(address indexed user, address indexed rewardsToken, uint256 reward);
+    event RewardsDurationUpdated(address token, uint256 newDuration);
+    event Recovered(address token, uint256 amount);
+    
+    
         /**
        * @dev Function is invoked by the proxy contract when the LendPool contract is added to the
        * LendPoolAddressesProvider of the market.
@@ -109,7 +116,10 @@ contract StabilityPool is
             poolLoan = ILoanPool(_poolLoans);
             percentBorrow = 9*1000;//percent 90%;
             borrowFee = 400; //percent 4%
+            redemptionFee = 200; //percent 2%
             _renounceOwnership();
+            addReward(_ndlToken,1);
+            addReward(_nftUSDToken,1);
         }
 
         function getTotalNFTUSDDeposits() external view  returns (uint) {
@@ -120,183 +130,25 @@ contract StabilityPool is
        * @dev Deposits an `amount` of underlying asset into the reserve, receiving in return overlying bTokens.
        * - E.g. User deposits 100 USDC and gets in return 100 bUSDC
        **/
-        function deposit(uint _amount) external  {
+        function deposit(uint _amount) external updateReward(msg.sender) {
+            address sender = msg.sender;
             _requireNonZeroAmount(_amount);
-            uint initialDeposit = deposits[msg.sender];
-//            ICommunityIssuance communityIssuanceCached = communityIssuance;
-//            _triggerNDLIssuance(communityIssuanceCached);
-            uint depositorNFTUSDGain = getDepositorNFTUSDGain(msg.sender);
-            _payOutNDLGains(msg.sender);
-            _sendNFTUSDtoStabilityPool(msg.sender, _amount);
-//            emit UserDepositChanged(msg.sender, newDeposit);
-//            emit NFTUSDGainWithdrawn(msg.sender, depositorNFTUSDGain, LUSDLoss); // LUSD Loss required for event log
-            _sendNFTUSDGainToDepositor(msg.sender, depositorNFTUSDGain);
+            totalNFTUSDDeposits = totalNFTUSDDeposits.add(_amount);
+            _balances[sender] = _balances[sender].add(_amount);
+
+            nftusdToken.sendToPool(sender, address(this), _amount);
+            emit Staked(sender, _amount);
         }
 //
-//        function withdraw(uint _amount) external override {
-//            require(_amount != 0, "withdraw can't zero");
-//            uint initialDeposit = deposits[msg.sender].initialValue;
-//            _requireUserHasDeposit(initialDeposit);
-//
-////            ICommunityIssuance communityIssuanceCached = communityIssuance;
-//
-////            _triggerNDLIssuance(communityIssuanceCached);
-//            uint depositorNFTUSDGain = getDepositorNFTUSDGain(msg.sender);
-//            uint NFTUSDtoWithdraw;
-//            if (_amount >= compoundedNFTUSDDeposit){
-//                NFTUSDtoWithdraw = compoundedNFTUSDDeposit;
-//            }else{
-//                NFTUSDtoWithdraw = _amount;
-//            }
-//            uint NFTUSDtoWithdraw = LiquityMath._min(_amount, compoundedNFTUSDDeposit);
-//            _payOutNDLGains(communityIssuanceCached, msg.sender);
-//            _sendNFTUSDToDepositor(msg.sender, NFTUSDtoWithdraw);
-//
-//            // Update deposit
-//            uint newDeposit = compoundedNFTUSDDeposit.sub(NFTUSDtoWithdraw);
-//            _updateDepositAndSnapshots(msg.sender, newDeposit);
-//            emit UserDepositChanged(msg.sender, newDeposit);
-//            emit UserDepositChanged(msg.sender, newDeposit);
-//
-//
-//            emit NFTUSDGainWithdrawn(msg.sender, depositorNFTUSDGain, LUSDLoss); // LUSD Loss required for event log
-//
-//            _sendNFTUSDGainToDepositor(depositorNFTUSDGain);
-//
-//        }
-        // --- Reward calculator functions for depositor and front end ---
+        function withdraw(uint256 _amount) public updateReward(msg.sender) {
+            address sender = msg.sender;
+            _requireNonZeroAmount(_amount);
+            totalNFTUSDDeposits = totalNFTUSDDeposits.sub(_amount);
+            _balances[sender] = _balances[sender].sub(_amount);
 
-        /* Calculates the NFTUSD gain earned by the deposit since its last snapshots were taken.
-        * Given by the formula:  E = d0 * (S - S(0))/P(0)
-        * where S(0) and P(0) are the depositor's snapshots of the sum S and product P, respectively.
-        * d0 is the last recorded deposit value.
-        */
-        function getDepositorNFTUSDGain(address _depositor) public view  returns (uint) {
-            uint initialDeposit = deposits[_depositor];
-
-            if (initialDeposit == 0) { return 0; }
-
-            Snapshots memory snapshots = depositSnapshots[_depositor];
-
-            uint NFTUSD = _getNFTUSDGainFromSnapshots(initialDeposit, snapshots);
-            return NFTUSD;
+            nftusdToken.returnFromPool(address(this), sender, _amount);
+            emit Withdrawn(sender, _amount);
         }
-
-        function _getNFTUSDGainFromSnapshots(uint initialDeposit, Snapshots memory snapshots) internal view returns (uint) {
-            /*
-            * Grab the sum 'S' from the epoch at which the stake was made. The ETH gain may span up to one scale change.
-            * If it does, the second portion of the ETH gain is scaled by 1e9.
-            * If the gain spans no scale change, the second portion will be 0.
-            */
-            uint128 epochSnapshot = snapshots.epoch;
-            uint128 scaleSnapshot = snapshots.scale;
-            uint S_Snapshot = snapshots.S;
-            uint P_Snapshot = snapshots.P;
-
-            uint firstPortion = epochToScaleToSum[epochSnapshot][scaleSnapshot].sub(S_Snapshot);
-            uint secondPortion = epochToScaleToSum[epochSnapshot][scaleSnapshot.add(1)];
-
-            uint NFTUSD = initialDeposit.mul(firstPortion.add(secondPortion)).div(P_Snapshot).div(DECIMAL_PRECISION);
-
-            return NFTUSD;
-        }
-
-        function _sendNFTUSDToDepositor(address _depositor, uint NFTUSDWithdrawal) internal {
-            if (NFTUSDWithdrawal == 0) {return;}
-            nftusdToken.transferFrom(address(this), _depositor, NFTUSDWithdrawal);
-            _decreaseNFTUSD(NFTUSDWithdrawal);
-        }
-        function _decreaseNFTUSD(uint _amount) internal {
-            uint newTotalNFTUSDDeposits = totalNFTUSDDeposits.sub(_amount);
-            totalNFTUSDDeposits = newTotalNFTUSDDeposits;
-//            emit StabilityPoolNFTUSDBalanceUpdated(newTotalNFTUSDDeposits);
-        }
-
-        function _sendNFTUSDGainToDepositor(address _depositor,uint _amount) internal {
-            if (_amount == 0) {return;}
-            uint newNFTUSD = NFTUSDGain.sub(_amount);
-            NFTUSDGain = newNFTUSD;
-//            emit StabilityPoolNFTUSDBalanceUpdated(newNFTUSD);
-
-
-            nftusdToken.transfer(_depositor,_amount);
-//            emit NFTUSDPaidToDepositor(_depositor, _amount);
-        }
-
-        function _updateDepositAndSnapshots(address _depositor, uint _newValue) internal {
-
-            deposits[_depositor] = _newValue;
-            if (_newValue == 0) {
-                delete depositSnapshots[_depositor];
-//                emit DepositSnapshotUpdated(_depositor, 0, 0, 0);
-                return;
-            }
-            uint128 currentScaleCached = currentScale;
-            uint128 currentEpochCached = currentEpoch;
-            uint currentP = P;
-
-            // Get S and G for the current epoch and current scale
-            uint currentS = epochToScaleToSum[currentEpochCached][currentScaleCached];
-            uint currentG = epochToScaleToG[currentEpochCached][currentScaleCached];
-
-            // Record new snapshots of the latest running product P, sum S, and sum G, for the depositor
-            depositSnapshots[_depositor].P = currentP;
-            depositSnapshots[_depositor].S = currentS;
-            depositSnapshots[_depositor].G = currentG;
-            depositSnapshots[_depositor].scale = currentScaleCached;
-            depositSnapshots[_depositor].epoch = currentEpochCached;
-
-//            emit DepositSnapshotUpdated(_depositor, currentP, currentS, currentG);
-        }
-
-        function getDepositorNDLGain(address _depositor) public view  returns (uint) {
-            uint initialDeposit = deposits[_depositor];
-            if (initialDeposit == 0) {return 0;}
-            /*
-            * If not tagged with a front end, the depositor gets a 100% cut of what their deposit earned.
-            * Otherwise, their cut of the deposit's earnings is equal to the kickbackRate, set by the front end through
-            * which they made their deposit.
-            */
-            uint kickbackRate =  DECIMAL_PRECISION ;
-
-            Snapshots memory snapshots = depositSnapshots[_depositor];
-            uint NDLGain = kickbackRate.mul(_getNDLGainFromSnapshots(initialDeposit, snapshots)).div(DECIMAL_PRECISION);
-            return NDLGain;
-        }
-
-        function _getNDLGainFromSnapshots(uint initialStake, Snapshots memory snapshots) internal view returns (uint) {
-            /*
-             * Grab the sum 'G' from the epoch at which the stake was made. The NDL gain may span up to one scale change.
-             * If it does, the second portion of the NDL gain is scaled by 1e9.
-             * If the gain spans no scale change, the second portion will be 0.
-             */
-            uint128 epochSnapshot = snapshots.epoch;
-            uint128 scaleSnapshot = snapshots.scale;
-            uint G_Snapshot = snapshots.G;
-            uint P_Snapshot = snapshots.P;
-
-            uint firstPortion = epochToScaleToG[epochSnapshot][scaleSnapshot].sub(G_Snapshot);
-            uint secondPortion = epochToScaleToG[epochSnapshot][scaleSnapshot.add(1)];
-
-            uint NDLGain = initialStake.mul(firstPortion.add(secondPortion)).div(P_Snapshot).div(DECIMAL_PRECISION);
-
-            return NDLGain;
-        }
-
-        function _payOutNDLGains(address _depositor) internal {
-            // Pay out depositor's NDL gain
-            uint depositorNDLGain = getDepositorNDLGain(_depositor);
-//            _communityIssuance.sendNDL(_depositor, depositorNDLGain);
-//            emit NDLPaidToDepositor(_depositor, depositorNDLGain);
-        }
-
-        function _sendNFTUSDtoStabilityPool(address _address, uint _amount) internal {
-            nftusdToken.sendToPool(_address, address(this), _amount);
-            uint newTotalNFTUSDDeposits = totalNFTUSDDeposits.add(_amount);
-            totalNFTUSDDeposits = newTotalNFTUSDDeposits;
-//            emit StabilityPoolNFTUSDBalanceUpdated(newTotalNFTUSDDeposits);
-        }
-
 
 
         function borrow(
@@ -305,211 +157,177 @@ contract StabilityPool is
             address nftAsset,
             uint256 nftTokenId,
             address onBehalfOf
-        ) external payable  {
+        ) external updateReward(address (0))  {
             require(onBehalfOf != address(0), "Errors.VL_INVALID_ONBEHALFOF_ADDRESS");
+            require(amount > 0, "Errors.VL_INVALID_AMOUNT");
             address initiator = _msgSender();
             uint256 loanId = poolLoan.getCollateralLoanId(nftAsset, nftTokenId);
 //            uint256 totalSupply = IERC721EnumerableUpgradeable(nftAsset).totalSupply();
 
-            (uint256  nftfloorPrice, uint256  nftAverageSales,uint256  nftvolatility) = nftOracle.getAssetPrice(nftAsset);
-            require(nftfloorPrice != 0,"no such nft supplyed");
-            uint256  collectionScore ; //TODO 回头把这部分逻辑补充上去
-
-
-            collectionScore = 1e4-nftvolatility+3*nftAverageSales;
-            nftAverageSales = nftfloorPrice.percentMul(collectionScore);
-            require(nftAverageSales > amount,"borrow amount is to high for this NFT");
+            uint256  nftPrice = nftOracle.getFinalPrice(nftAsset);
+            require(nftPrice != 0,"no such nft supplyed");
+            require(nftPrice > amount,"borrow amount is to high for this NFT");
 
             if (loanId == 0) {
                 loanId = poolLoan.createLoan( initiator, onBehalfOf, nftAsset, nftTokenId, amount);
             } else {
-                poolLoan.updateLoan(initiator, loanId, amount);
+                poolLoan.updateLoan(initiator, loanId, amount, true);
             }
+            notifyRewardAmount(address(ndlToken),amount.percentMul(borrowFee));
+            ndlToken.sendNDLToPool(initiator,amount.percentMul(borrowFee));
+            totalExtractionFee += amount.percentMul(borrowFee);
 
-            ndlToken.sendToNDLStaking(initiator,amount.percentMul(borrowFee));
-            nftusdToken.mint( onBehalfOf, amount.percentMul(percentBorrow)); //TODO 定义percentBorrow
 
-            nftusdToken.mint(address(this), amount - amount.percentMul(percentBorrow));//TODO 定义percentBorrow
+            nftusdToken.mint( onBehalfOf, amount.percentMul(percentBorrow));
+            nftusdToken.mint(address(this), amount - amount.percentMul(percentBorrow));
             totalSecurityDeposit += amount - amount.percentMul(percentBorrow);
-
-//            emit Borrow(
-//                initiator,
-//                asset,
-//                amount,
-//                nftAsset,
-//                nftTokenId,
-//                onBehalfOf,
-//                loanId
-//            );
     }
 
 
-//    function _triggerNDLIssuance(ICommunityIssuance _communityIssuance) internal {
-//        uint NDLIssuance = _communityIssuance.issueNDL();
-//        _updateG(NDLIssuance);
-//    }
 
-    function _updateG(uint _NDLIssuance) internal {
-        uint totalNFTUSD = totalNFTUSDDeposits; // cached to save an SLOAD
-        /*
-        * When total deposits is 0, G is not updated. In this case, the NDL issued can not be obtained by later
-        * depositors - it is missed out on, and remains in the balanceof the CommunityIssuance contract.
-        *
-        */
-        if (totalNFTUSD == 0 || _NDLIssuance == 0) {return;}
+    function repay(
+        address nftAsset,
+        uint256 nftTokenId,
+        uint256 amount
+    ) external  updateReward(address (0)) returns (uint256, bool) {
 
-//        uint NDLPerUnitStaked;
-//        NDLPerUnitStaked =_computeNDLPerUnitStaked(_NDLIssuance, totalNFTUSD);
-//
-//        uint marginalNDLGain = NDLPerUnitStaked.mul(P);
-//        epochToScaleToG[currentEpoch][currentScale] = epochToScaleToG[currentEpoch][currentScale].add(marginalNDLGain);
+        address initiator = _msgSender();
+        uint256 loanId = poolLoan.getCollateralLoanId(nftAsset, nftTokenId);
+        require(loanId != 0,"no such debt nft");
+        (, ,uint256 borrowAmount) = poolLoan.getLoanCollateralAndReserve(loanId);
 
-//        emit G_Updated(epochToScaleToG[currentEpoch][currentScale], currentEpoch, currentScale);
+        uint256 repayAmount = borrowAmount;
+        bool isUpdate = false;
+        if ( amount < repayAmount) {
+            repayAmount = amount;
+            poolLoan.updateLoan(
+            initiator,
+            loanId,
+            repayAmount,
+        false
+            );
+        } else {
+            isUpdate = true;
+            poolLoan.repayLoan(
+            initiator,
+            loanId,
+           repayAmount
+            );
+        }
+
+        ndlToken.sendNDLToPool(
+           initiator,
+            repayAmount.percentMul(redemptionFee)
+        );
+        notifyRewardAmount(address(ndlToken),repayAmount.percentMul(redemptionFee));
+
+        nftusdToken.burn(
+            initiator,
+            repayAmount
+        );
+        nftusdToken.burn(
+            address(this),
+        (borrowAmount - repayAmount).percentMul(1e4 - percentBorrow)
+        );
+        totalSecurityDeposit -= (borrowAmount - repayAmount).percentMul(1e4 - percentBorrow);
+        totalExtractionFee += repayAmount.percentMul(redemptionFee);
+        return (repayAmount, !isUpdate);
     }
 
-//    function _computeNDLPerUnitStaked(uint _NDLIssuance, uint _totalNFTUSDDeposits) internal returns (uint) {
-//        /*
-//        * Calculate the NDL-per-unit staked.  Division uses a "feedback" error correction, to keep the
-//        * cumulative error low in the running total G:
-//        *
-//        * 1) Form a numerator which compensates for the floor division error that occurred the last time this
-//        * function was called.
-//        * 2) Calculate "per-unit-staked" ratio.
-//        * 3) Multiply the ratio back by its denominator, to reveal the current floor division error.
-//        * 4) Store this error for use in the next correction when this function is called.
-//        * 5) Note: static analysis tools complain about this "division before multiplication", however, it is intended.
-//        */
-//        uint NDLNumerator = _NDLIssuance.mul(DECIMAL_PRECISION).add(lastNDLError);
-//
-//        uint NDLPerUnitStaked = NDLNumerator.div(_totalNFTUSDDeposits);
-////        lastNDLError = NDLNumerator.sub(NDLPerUnitStaked.mul(_totalNFTUSDDeposits));
-//
-//        return NDLPerUnitStaked;
-//    }
+    function getTotalSecurityDeposit() external view returns (uint256) {
+        return totalSecurityDeposit;
+    }
 
-//    function repay(
-//        address nftAsset,
-//        uint256 nftTokenId,
-//        uint256 amount
-//    ) external override nonReentrant whenNotPaused returns (uint256, bool) {
-//        RepayLocalVars memory vars;
-//        vars.initiator = _msgSender();
-//        uint loadId = ILendPoolLoan(vars.loanAddress).getCollateralLoanId(nftAsset, nftTokenId);
-//        require(loadId != 0,"no such debt nft");
-//        (, vars.borrowAmount) = ILendPoolLoan(vars.poolLoan).getLoanReserveBorrowAmount(vars.loanId);
-//
-//        vars.repayAmount = vars.borrowAmount.mul(percentBorrow);
-//        vars.isUpdate = false;
-//        if ( amount < vars.repayAmount) {
-//        vars.isUpdate = true;
-//        vars.repayAmount = amount;
-//        }
-//
-//        if (vars.isUpdate) {
-//            ILendPoolLoan(vars.poolLoan).updateLoan(
-//            vars.initiator,
-//            vars.loanId,
-//            0,
-//            vars.repayAmount
-//            );
-//        } else {
-//            ILendPoolLoan(vars.poolLoan).repayLoan(
-//            vars.initiator,
-//            vars.loanId,
-//            vars.repayAmount
-//            );
-//        }
-//
-//        INDLToken(NDLToken).transferFrom(
-//            vars.initiator,
-//            address(this),
-//            amount//TODO amount
-//        );
-//
-//        IERC20(NFTUSDTokenAddress).burn(
-//            vars.initiator,
-//            amount //TODO 定义percentBorrow
-//        );
-//
-//        INFTUSDToken(NFTUSDTokenAddress).burn(
-//            address(this),
-//            (vars.borrowAmount - vars.borrowAmount.percentMul(percentBorrow))*amount/vars.borrowAmount//TODO 定义percentBorrow
-//        );
-//        if (!vars.isUpdate) {
-//            IERC721Upgradeable(loanData.nftAsset).safeTransferFrom(address(this), loanData.borrower, params.nftTokenId);
-//        }
-//        emit Repay(
-//            vars.initiator,
-//            vars.repayAmount,
-//            nftAsset,
-//            nftTokenId,
-//            borrower,
-//            vars.loanId
-//        );
-//        return (vars.repayAmount, !vars.isUpdate);
-//    }
+    function getTotalExtractionFee() external view returns (uint256) {
+        return totalExtractionFee;
+    }
 
-//    function liquidate(
-//        address borrower,
-//        address nftAsset,
-//        uint256 nftTokenId
-//    ) external override nonReentrant whenNotPaused returns (uint256) {
-//        (uint256 accountDebt,uint256 totalNFTLocked) = healthFactor(borrower);
-//        require(accountDebt < totalNFTLocked,"this is not the liquidate line");
-//        uint256 loanID = poolLoan.getCollateralLoanId(nftAsset,nftTokenId);
-//        DataTypes.LoanData loan = poolLoan.getLoan(loadID);
-//        require(borrow != loan.borrower, "no right borrower");
-//        //if reach the liquidate line
-//        (uint256 nftfloorPrice, uint256 nftAverageSales,uint256 nftvolatility) = nftOracle.getAssetPrice(nftAsset);
-//        uint collectionScore ; //TODO 回头把这部分逻辑补充上去
-//        uint maxDebtPrice;
-//        collectionScore = 1e4 - nftvolatility + 3 * nftAverageSales;
-//        maxDebtPrice = nftfloorPrice.percentMul(collectionScore);
-//        bool success =  INFTUSDToken(NFTUSDTokenAddress).transferFrom(
-//        _msgSender(),
-//        address(this),
-//        maxDebtPrice
-//        );
-//
-//        poolLoan.liquidateLoan(
-//            loanId,
-//            borrowAmount
-//        );
-//        nftusdToken.transferFrom(
-//            _msgSender(),
-//            address(this),
-//            maxDebtPrice - loan.amount.percentMul(1e4-percentBorrow)
-//        );
-//        nftusdToken.burn(
-//            address(this),
-//            maxDebtPrice
-//        );
-//    uint256 newtotalSecurityDeposit = totalSecurityDeposit - loan.amount.percentMul(1e4-percentBorrow);
-//    if (!success){
-//        ndlToken.transferFrom(_msgSender(),address(this), amount.percentMul(borrowFee));
-//    }
-//        return 0;
-//    }
+    function liquidate(
+        address borrower,
+        address nftAsset,
+        uint256 nftTokenId
+    ) external  returns (uint256) {
 
-//    function healthFactor(address user) external view nonReentrant whenNotPaused returns (uint256 accountDebt,uint256 totalNFTLocked){
-//        var list = addressLoans[user];
-//        require(list.length !=0,"no such user");
-//        uint256 totalDebt;
-//        uint256 totalNFTValue;
-//        for (uint256 i = 0 ; i < list.length; i++){
-//            if (_loads[list[i]].state != dataTypes.LoabState.active){
-//                continue;
-//            }
-//            (uint256 nftfloorPrice, uint256 nftAverageSales,uint256 nftvolatility) = nftOracle.getAssetPrice(nftAsset);
-//            uint collectionScore ; //TODO 回头把这部分逻辑补充上去
-//            uint maxDebtPrice;
-//            collectionScore = 1e4 - nftvolatility + 3 * nftAverageSales;
-//            maxDebtPrice = nftfloorPrice.percentMul(collectionScore);
-//            totalNFTLocked += maxDebtPrice;
-//            accountDebt = _loads[list[i]].amount;
-//        }
-//        return;
-//    }
+        (uint256 accountDebt,uint256 totalNFTLocked) = healthFactor(borrower);
+        require(accountDebt < totalNFTLocked,"this is not the liquidate line");
+        address initiator = _msgSender();
+        uint256 loanID = poolLoan.getCollateralLoanId(nftAsset,nftTokenId);
+        DataTypes.LoanData memory loan = poolLoan.getLoan(loanID);
+        //if reach the liquidate line
+        uint256 nftDebtPrice = nftOracle.getFinalPrice(nftAsset);
+        require(nftDebtPrice > loan.amount,"this is not the liquidate line");
+        uint256 userBalance = nftusdToken.balanceOf(msg.sender);
+        if (userBalance >= loan.amount.percentMul(percentBorrow)){
+            nftusdToken.burn(
+                initiator,
+                loan.amount.percentMul(percentBorrow)
+            );
+            nftusdToken.transfer(
+                initiator,
+                loan.amount - loan.amount.percentMul(percentBorrow)
+            );
+            poolLoan.liquidateLoan(
+                loan.borrower,
+                loan.loanId,
+                loan.amount,
+                true
+            );
+            ndlToken.sendNDLToPool(initiator,loan.amount.percentMul(borrowFee));
+            totalExtractionFee += loan.amount.percentMul(borrowFee);
+            totalSecurityDeposit = totalSecurityDeposit - loan.amount.percentMul(1e4-percentBorrow);
+
+        }else{
+            poolLoan.liquidateLoan(
+                loan.borrower,
+                loan.loanId,
+                loan.amount,
+                false
+            );
+            poolLoan.createLoan(
+                initiator,
+                    initiator,
+                nftAsset,
+                nftTokenId,
+                    nftDebtPrice
+            );
+            nftusdToken.mint(
+                initiator,
+                nftDebtPrice.percentMul(percentBorrow)- userBalance
+            );
+            ndlToken.sendNDLToPool(initiator,userBalance.percentMul(borrowFee));
+            totalExtractionFee += userBalance.percentMul(borrowFee);
+            notifyRewardAmount(address(nftusdToken),(loan.amount - nftDebtPrice).percentMul(1e4-percentBorrow));
+            totalSecurityDeposit = totalSecurityDeposit - (loan.amount - nftDebtPrice).percentMul(1e4-percentBorrow);
+        }
+        return 0;
+    }
+
+    function healthFactor(address user) public view  returns (uint256 accountDebt,uint256 totalNFTLocked){
+        uint256[] memory loanIds = poolLoan.getLoanIds(user);
+        uint256 nftDebtPrice;
+        uint256 collectionScore ;
+        uint256 maxDebtPrice;
+        address nftAsset;
+        uint256 amount ;
+
+        for (uint256 i = 0; i < loanIds.length; i++) {
+            (nftAsset, , amount) = poolLoan.getLoanCollateralAndReserve(loanIds[i]);
+            nftDebtPrice = nftOracle.getFinalPrice(nftAsset);
+            maxDebtPrice = nftDebtPrice.percentMul(collectionScore);
+            totalNFTLocked += maxDebtPrice;
+           accountDebt += amount;
+        }
+        return (accountDebt,totalNFTLocked);
+    }
+
+    function getLoanIds(address user) external view returns (uint256[] memory) {
+        return poolLoan.getLoanIds(user);
+    }
+
+    function getLoanCollateralAndReserve(uint256 loanId) external view returns (address nftAsset, uint256 nftTokenId, uint256 amount) {
+        return poolLoan.getLoanCollateralAndReserve(loanId);
+    }
+
 
     function onERC721Received(
         address operator,
@@ -535,9 +353,131 @@ contract StabilityPool is
     }
 
     function _requireUserHasNoDeposit(address _address) internal view {
-        uint initialDeposit = deposits[_address];
+        uint initialDeposit = _balances[_address];
         require(initialDeposit == 0, 'StabilityPool: User must have no deposit');
     }
 
 
+
+    function getReward() public  updateReward(msg.sender) {
+
+        for (uint i; i < rewardTokens.length; i++) {
+            address _rewardsToken = rewardTokens[i];
+            uint256 reward = rewards[msg.sender][_rewardsToken];
+            if (reward > 0) {
+                rewards[msg.sender][_rewardsToken] = 0;
+                IERC20Upgradeable(_rewardsToken).transfer(msg.sender, reward);
+                emit RewardPaid(msg.sender, _rewardsToken, reward);
+            }
+        }
+    }
+
+    function notifyRewardAmount(address _rewardsToken, uint256 reward) public  {
+
+        if (block.timestamp >= rewardData[_rewardsToken].periodFinish) {
+            rewardData[_rewardsToken].rewardRate = reward.div(rewardData[_rewardsToken].rewardsDuration);
+        } else {
+            uint256 remaining = rewardData[_rewardsToken].periodFinish.sub(block.timestamp);
+            uint256 leftover = remaining.mul(rewardData[_rewardsToken].rewardRate);
+            rewardData[_rewardsToken].rewardRate = reward.add(leftover).div(rewardData[_rewardsToken].rewardsDuration);
+        }
+
+        rewardData[_rewardsToken].lastUpdateTime = block.timestamp;
+        rewardData[_rewardsToken].periodFinish = block.timestamp.add(rewardData[_rewardsToken].rewardsDuration);
+        emit RewardAdded(reward);
+    }
+
+
+
+//    // Added to support recovering LP Rewards from other systems such as BAL to be distributed to holders
+//    function recoverERC20(address tokenAddress, uint256 tokenAmount) external onlyOwner {
+//        require(tokenAddress != address(stakingToken), "Cannot withdraw staking token");
+//        require(rewardData[tokenAddress].lastUpdateTime == 0, "Cannot withdraw reward token");
+//        IERC20Upgradeable(tokenAddress).transfer(owner, tokenAmount);
+//        emit Recovered(tokenAddress, tokenAmount);
+//    }
+
+    function setRewardsDuration(address _rewardsToken, uint256 _rewardsDuration) external {
+        require(
+            block.timestamp > rewardData[_rewardsToken].periodFinish,
+            "Reward period still active"
+        );
+//        require(rewardData[_rewardsToken].rewardsDistributor == msg.sender);
+        require(_rewardsDuration > 0, "Reward duration must be non-zero");
+        rewardData[_rewardsToken].rewardsDuration = _rewardsDuration;
+        emit RewardsDurationUpdated(_rewardsToken, rewardData[_rewardsToken].rewardsDuration);
+    }
+
+
+    modifier updateReward(address account) {
+        for (uint i; i < rewardTokens.length; i++) {
+            address token = rewardTokens[i];
+            rewardData[token].rewardPerTokenStored = rewardPerToken(token);
+            rewardData[token].lastUpdateTime = lastTimeRewardApplicable(token);
+            if (account != address(0)) {
+                rewards[account][token] = earned(account, token);
+                userRewardPerTokenPaid[account][token] = rewardData[token].rewardPerTokenStored;
+            }
+        }
+        _;
+    }
+
+
+    function addReward(
+        address _rewardsToken,
+        uint256 _rewardsDuration
+    )
+    private
+    {
+        require(rewardData[_rewardsToken].rewardsDuration == 0);
+        rewardTokens.push(_rewardsToken);
+        rewardData[_rewardsToken].rewardsDuration = _rewardsDuration;
+    }
+
+
+    function lastTimeRewardApplicable(address _rewardsToken) public view returns (uint256) {
+        return Math.min(block.timestamp, rewardData[_rewardsToken].periodFinish);
+    }
+
+    function rewardPerToken(address _rewardsToken) public view returns (uint256) {
+        if (totalNFTUSDDeposits == 0) {
+            return rewardData[_rewardsToken].rewardPerTokenStored;
+        }
+        return
+        rewardData[_rewardsToken].rewardPerTokenStored.add(
+            lastTimeRewardApplicable(_rewardsToken).sub(rewardData[_rewardsToken].lastUpdateTime).mul(rewardData[_rewardsToken].rewardRate).mul(1e18).div(totalNFTUSDDeposits)
+        );
+    }
+
+    function earned(address account, address _rewardsToken) public view returns (uint256) {
+        return _balances[account].mul(rewardPerToken(_rewardsToken).sub(userRewardPerTokenPaid[account][_rewardsToken])).div(1e18).add(rewards[account][_rewardsToken]);
+    }
+
+
+}
+
+
+library Math {
+    /**
+     * @dev Returns the largest of two numbers.
+     */
+    function max(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a >= b ? a : b;
+    }
+
+    /**
+     * @dev Returns the smallest of two numbers.
+     */
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
+    }
+
+    /**
+     * @dev Returns the average of two numbers. The result is rounded towards
+     * zero.
+     */
+    function average(uint256 a, uint256 b) internal pure returns (uint256) {
+        // (a + b) / 2 can overflow, so we distribute
+        return (a / 2) + (b / 2) + ((a % 2 + b % 2) / 2);
+    }
 }

@@ -55,12 +55,17 @@ INDLToken,
   function _burn(address account, uint256 amount) internal override(ERC20Upgradeable, ERC20VotesUpgradeable) {
     super._burn(account, amount);
   }
+
   function mint(address to, uint256 amount) public onlyPool {
     _mint(to, amount);
   }
-  function sendToNDLStaking(address _sender, uint256 _amount) external onlyPool{
+
+  function sendNDLToPool(address _sender, uint256 _amount) external onlyPool{
     _transfer(_sender, _pool, _amount);
   }
 
+  function returnFromPool(address _receiver, uint256 _amount) external onlyPool{
+    _transfer(_pool, _receiver, _amount);
+  }
 
 }

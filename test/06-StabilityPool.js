@@ -89,6 +89,21 @@ describe("StabilityPool", function () {
         await StabilityPoolToken.connect(address1).deposit(8);
         console.log("NFTUSD total deposit: ",await StabilityPoolToken.getTotalNFTUSDDeposits())
 
+        //withdraw NFTUSD
+        await StabilityPoolToken.connect(address1).withdraw(8);
+        console.log("NFTUSD total deposit: ",await StabilityPoolToken.getTotalNFTUSDDeposits())
+        //repay NFTUSD
+        await StabilityPoolToken.connect(address1).repay(gameItem.address, receipt1.events[0].args[2].toNumber() ,50);
+
+        console.log("nftusd balance of address1: ",await NFTUSDToken.balanceOf(await address1.getAddress()))
+        const loanids = await StabilityPoolToken.getLoanIds(await address1.getAddress())
+        console.log("return loanid",loanids[0])
+        const loan = await StabilityPoolToken.getLoanCollateralAndReserve(loanids[0])
+        console.log("return loan",loan)
+        const totalNDL = await StabilityPoolToken.getTotalExtractionFee()
+        console.log("getTotalExtractionFee:",totalNDL)
+
+
     })
 
 });

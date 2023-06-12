@@ -27,13 +27,8 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
     mapping(address => uint256) private _nftTotalCollateral;
     mapping(address => mapping(address => uint256)) private _userNftCollateral;
 
-    // interceptor whitelist
-    mapping(address => bool) private _loanRepaidInterceptorWhitelist;
-    // Mapping from token to approved burn interceptor addresses
-    mapping(address => mapping(uint256 => address[])) private _loanRepaidInterceptors;
-    // locker whitelist
-    mapping(address => bool) private _flashLoanLockerWhitelist;
-    mapping(address => uint256[]) addressLoans;
+    mapping(address => uint256[]) private _userLoans;
+
 
 //    IStabilityPool private _stabilityPool;
     address private _stabilityPoolAddress;
@@ -89,9 +84,8 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
         _userNftCollateral[onBehalfOf][nftAsset] += 1;
 
         _nftTotalCollateral[nftAsset] += 1;
-
+        _userLoans[initiator].push(loanId);
         emit LoanCreated(initiator, onBehalfOf, loanId, nftAsset, nftTokenId, amount);
-        addressLoans[_msgSender()].push(loanId);
         return (loanId);
 }
 
@@ -99,16 +93,20 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
     function updateLoan(
         address initiator,
         uint256 loanId,
-        uint256 amountAdded
+        uint256 amountAdded,
+        bool isAdd
     ) external override onlyStabilityPool {
     // Must use storage to change state
         DataTypes.LoanData storage loan = _loans[loanId];
 
         // Ensure valid loan state
         require(loan.state == DataTypes.LoanState.Active, "LPL_INVALID_LOAN_STATE");
+        if (isAdd){
+            loan.amount += amountAdded;
+        }else{
+            loan.amount -= amountAdded;
+        }
 
-        uint256 amountScaled = 0;
-        loan.amount += amountAdded;
 
         emit LoanUpdated(
         initiator,
@@ -146,6 +144,13 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
 
         IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), _msgSender(), loan.nftTokenId);
 
+        for (uint256 i = 0; i < _userLoans[initiator].length; i++) {
+            if (_userLoans[initiator][i] == loanId) {
+                _userLoans[initiator][i] = _userLoans[initiator][_userLoans[initiator].length - 1];
+                _userLoans[initiator].pop();
+                break;
+            }
+        }
         emit LoanRepaid(initiator, loanId, loan.nftAsset, loan.nftTokenId,  amount);
 
     }
@@ -154,7 +159,8 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
     function liquidateLoan(
         address initiator,
         uint256 loanId,
-        uint256 borrowAmount
+        uint256 borrowAmount,
+        bool isTransfer
     ) external override onlyStabilityPool {
         // Must use storage to change state
         DataTypes.LoanData storage loan = _loans[loanId];
@@ -174,7 +180,18 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
 
         require(_nftTotalCollateral[loan.nftAsset] >= 1, "LP_INVALIED_NFT_AMOUNT");
         _nftTotalCollateral[loan.nftAsset] -= 1;
+        if (isTransfer) {
+            IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), _msgSender(), loan.nftTokenId);
+        }
         IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), _msgSender(), loan.nftTokenId);
+
+        for (uint256 i = 0; i < _userLoans[initiator].length; i++) {
+            if (_userLoans[initiator][i] == loanId) {
+                _userLoans[initiator][i] = _userLoans[initiator][_userLoans[initiator].length - 1];
+                _userLoans[initiator].pop();
+                break;
+            }
+        }
         emit LoanLiquidated(
             initiator,
             loanId,
@@ -197,6 +214,11 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
         return IERC721ReceiverUpgradeable.onERC721Received.selector;
     }
 
+
+
+    function getLoanIds(address user) external view override returns (uint256[] memory) {
+        return _userLoans[user];
+    }
     function borrowerOf(uint256 loanId) external view override returns (address) {
         return _loans[loanId].borrower;
     }

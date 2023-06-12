@@ -51,7 +51,6 @@ interface ILoanPool {
 
 
 
-
   /**
    * @dev Emitted when a loan is liquidate by the liquidator
    * @param user The address initiating the action
@@ -92,7 +91,8 @@ interface ILoanPool {
   function updateLoan(
     address initiator,
     uint256 loanId,
-    uint256 amountAdded
+    uint256 amountAdded,
+    bool isAdd
   ) external;
 
   /**
@@ -116,6 +116,9 @@ interface ILoanPool {
 
 
 
+  function getLoanIds(address user) external view  returns (uint256[] memory);
+
+
   /**
    * @dev Liquidate the given loan
    *
@@ -130,7 +133,8 @@ interface ILoanPool {
   function liquidateLoan(
     address initiator,
     uint256 loanId,
-    uint256 borrowAmount
+    uint256 borrowAmount,
+    bool isTransfer
   ) external;
 
 

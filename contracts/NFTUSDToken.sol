@@ -66,7 +66,6 @@ contract NFTUSDToken is INFTUSDToken , ERC20, ERC20Permit, Ownable{
     }
 
     function returnFromPool(address _poolAddress, address _receiver, uint256 _amount) external override onlyPool{
-
         _transfer(_poolAddress, _receiver, _amount);
     }
 }

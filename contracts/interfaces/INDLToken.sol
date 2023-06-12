@@ -3,7 +3,7 @@
 pragma solidity ^0.8.8;
 
 //import "../dependencies/IERC2612.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+//import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 interface INDLToken  {
 
   // --- Events ---
@@ -14,6 +14,7 @@ interface INDLToken  {
 
   // --- Functions ---
 
-  function sendToNDLStaking(address _sender, uint256 _amount) external;
+  function sendNDLToPool(address _sender, uint256 _amount) external;
+  function returnFromPool(address _sender, uint256 _amount) external;
 
 }

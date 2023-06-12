@@ -6,7 +6,12 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {BlockContext} from "./utils/BlockContext.sol";
 import {INFTOracle} from "./interfaces/INFTOracle.sol";
 
+import "./libraries/math/PercentageMath.sol";
+import "./dependencies/SafeMath.sol";
+
 contract NFTOracle is  INFTOracle, Initializable, OwnableUpgradeable, BlockContext {
+    using SafeMath for uint256;
+    using PercentageMath for uint256;
     modifier onlyAdmin() {
         require(_msgSender() == priceFeedAdmin, "NFTOracle: !admin");
         _;
@@ -192,7 +197,7 @@ contract NFTOracle is  INFTOracle, Initializable, OwnableUpgradeable, BlockConte
         emit SetAssetTwapPrice(_nftContract, twapPrice, _timestamp);
     }
 
-    function getAssetPrice(address _nftContract) external view override returns (uint256,uint256,uint256) {
+    function getAssetPrice(address _nftContract) public view override returns (uint256,uint256,uint256) {
         require(isExistedKey(_nftContract), "NFTOracle: key not existed");
         uint256 len = getPriceFeedLength(_nftContract);
         require(len > 0, "NFTOracle: no price data");
@@ -202,6 +207,21 @@ contract NFTOracle is  INFTOracle, Initializable, OwnableUpgradeable, BlockConte
         } else {
             return (twapPrice, nftPriceFeedMap[_nftContract].nftPriceData[len - 1].sales, nftPriceFeedMap[_nftContract].nftPriceData[len - 1].volatility);
         }
+    }
+
+    function getFinalPrice(address _nftContract) external view override returns (uint256) {
+        require(isExistedKey(_nftContract), "NFTOracle: key not existed");
+        uint256 len = getPriceFeedLength(_nftContract);
+        require(len > 0, "NFTOracle: no price data");
+        uint256  collectionScore ;
+        uint256  nftDebtPrice;
+        uint256  nftvolatility;
+        uint256  nftAverageSales;
+        uint256  nftfloorPrice;
+        (nftfloorPrice, nftvolatility, nftAverageSales) = getAssetPrice(_nftContract);
+        collectionScore = 1e4- nftvolatility + 3 * nftAverageSales;
+        nftDebtPrice = nftfloorPrice.percentMul(collectionScore) * 1e16 ;
+        return nftDebtPrice;
     }
 
 
