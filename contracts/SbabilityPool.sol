@@ -227,7 +227,7 @@ contract StabilityPool is
         );
         nftusdToken.burn(
             address(this),
-        (borrowAmount - repayAmount).percentMul(1e4 - percentBorrow)
+         repayAmount.percentMul(1e4 - percentBorrow)
         );
         totalSecurityDeposit -= (borrowAmount - repayAmount).percentMul(1e4 - percentBorrow);
         totalExtractionFee += repayAmount.percentMul(redemptionFee);
@@ -305,16 +305,13 @@ contract StabilityPool is
     function healthFactor(address user) public view  returns (uint256 accountDebt,uint256 totalNFTLocked){
         uint256[] memory loanIds = poolLoan.getLoanIds(user);
         uint256 nftDebtPrice;
-        uint256 collectionScore ;
-        uint256 maxDebtPrice;
         address nftAsset;
         uint256 amount ;
 
         for (uint256 i = 0; i < loanIds.length; i++) {
             (nftAsset, , amount) = poolLoan.getLoanCollateralAndReserve(loanIds[i]);
             nftDebtPrice = nftOracle.getFinalPrice(nftAsset);
-            maxDebtPrice = nftDebtPrice.percentMul(collectionScore);
-            totalNFTLocked += maxDebtPrice;
+            totalNFTLocked += nftDebtPrice;
            accountDebt += amount;
         }
         return (accountDebt,totalNFTLocked);

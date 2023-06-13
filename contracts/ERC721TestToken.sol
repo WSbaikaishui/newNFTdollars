@@ -9,7 +9,7 @@ contract GameItem is ERC721URIStorage {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
-    constructor() ERC721("GameItem", "ITM") {}
+    constructor() ERC721(" ", "ITM") {}
 
     function awardItem(address player, string memory tokenURI)
     public

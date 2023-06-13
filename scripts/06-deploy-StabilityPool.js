@@ -6,7 +6,7 @@ const { ethers, run, network } = require("hardhat")
 async function main() {
     const addressList = readAddressList();
     const StabilityPool = await ethers.getContractFactory("StabilityPool")
-    console.log("Deploying GameItem...")
+    console.log("Deploying Stability Pool...")
     const stabilityPool = await StabilityPool.deploy()
     await stabilityPool.deployed()
     addressList["StabilityPool"] = stabilityPool.address;
@@ -40,25 +40,7 @@ async function main() {
     addressList["LoanPool"] = loanPool.address;
     console.log("LoanPool deployed to:", loanPool.address)
     storeAddressList(addressList);
-    //initial
-    await nftusd.initializePool(stabilityPool.address);
-    console.log("NFTUSDToken is initialized successfully")
 
-    await ndl.initialize();
-    console.log("Ndl is initialized successfully")
-    await ndl.initializePool(stabilityPool.address);
-    console.log("NDLToken is initializePool successfully  0x40ebF7a33f8FAb287B9616F54d45fC6371c6f162")
-    await nftoracle.initialize(
-        "0x40ebF7a33f8FAb287B9616F54d45fC6371c6f162",
-        200000000000,
-        100000000000,
-        1800,
-        600,
-        600);
-    console.log("NFTOracleToken is initialized successfully")
-    await loanPool.initialize(stabilityPool.address);
-    console.log("LoanPoolToken is initialized successfully")
-    await stabilityPool.initialize(nftoracle.address,nftusd.address,ndl.address,loanPool.address);
 
 }
 
