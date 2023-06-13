@@ -273,6 +273,7 @@ contract StabilityPool is
                 true
             );
             ndlToken.sendNDLToPool(initiator,loan.amount.percentMul(borrowFee));
+            notifyRewardAmount(address(ndlToken),loan.amount.percentMul(borrowFee));
             totalExtractionFee += loan.amount.percentMul(borrowFee);
             totalSecurityDeposit = totalSecurityDeposit - loan.amount.percentMul(1e4-percentBorrow);
 
@@ -295,6 +296,7 @@ contract StabilityPool is
                 nftDebtPrice.percentMul(percentBorrow)- userBalance
             );
             ndlToken.sendNDLToPool(initiator,userBalance.percentMul(borrowFee));
+            notifyRewardAmount(address(ndlToken),userBalance.percentMul(borrowFee));
             totalExtractionFee += userBalance.percentMul(borrowFee);
             notifyRewardAmount(address(nftusdToken),(loan.amount - nftDebtPrice).percentMul(1e4-percentBorrow));
             totalSecurityDeposit = totalSecurityDeposit - (loan.amount - nftDebtPrice).percentMul(1e4-percentBorrow);
@@ -325,6 +327,13 @@ contract StabilityPool is
         return poolLoan.getLoanCollateralAndReserve(loanId);
     }
 
+    function getAllLoanMessage(address user) external view returns (uint256[] memory loanIds, address[] memory nftAssets, uint256[] memory nftTokenIds, uint256[] memory amounts) {
+        loanIds = poolLoan.getLoanIds(user);
+        for (uint256 i = 0; i < loanIds.length; i++) {
+            (nftAssets[i], nftTokenIds[i], amounts[i]) = poolLoan.getLoanCollateralAndReserve(loanIds[i]);
+        }
+        return (loanIds, nftAssets, nftTokenIds, amounts);
+    }
 
     function onERC721Received(
         address operator,
