@@ -195,16 +195,15 @@ contract StabilityPool is
         uint256 loanId = poolLoan.getCollateralLoanId(nftAsset, nftTokenId);
         require(loanId != 0,"no such debt nft");
         (, ,uint256 borrowAmount) = poolLoan.getLoanCollateralAndReserve(loanId);
-
         uint256 repayAmount = borrowAmount;
         bool isUpdate = false;
-        if ( amount < repayAmount) {
-            repayAmount = amount;
+        if ( amount.percentDiv(percentBorrow) < repayAmount) {
+           repayAmount = amount.percentDiv(percentBorrow);
             poolLoan.updateLoan(
             initiator,
             loanId,
             repayAmount,
-        false
+            false
             );
         } else {
             isUpdate = true;
@@ -223,13 +222,13 @@ contract StabilityPool is
 
         nftusdToken.burn(
             initiator,
-            repayAmount
+            repayAmount.percentMul(percentBorrow)
         );
         nftusdToken.burn(
             address(this),
          repayAmount.percentMul(1e4 - percentBorrow)
         );
-        totalSecurityDeposit -= (borrowAmount - repayAmount).percentMul(1e4 - percentBorrow);
+        totalSecurityDeposit -=  repayAmount.percentMul(1e4 - percentBorrow);
         totalExtractionFee += repayAmount.percentMul(redemptionFee);
         return (repayAmount, !isUpdate);
     }
@@ -329,6 +328,9 @@ contract StabilityPool is
 
     function getAllLoanMessage(address user) external view returns (uint256[] memory loanIds, address[] memory nftAssets, uint256[] memory nftTokenIds, uint256[] memory amounts) {
         loanIds = poolLoan.getLoanIds(user);
+        nftAssets = new address[](loanIds.length);
+        nftTokenIds = new uint256[](loanIds.length);
+        amounts = new uint256[](loanIds.length);
         for (uint256 i = 0; i < loanIds.length; i++) {
             (nftAssets[i], nftTokenIds[i], amounts[i]) = poolLoan.getLoanCollateralAndReserve(loanIds[i]);
         }

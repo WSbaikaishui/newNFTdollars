@@ -142,7 +142,7 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
         require(_nftTotalCollateral[loan.nftAsset] >= 1, "LP_INVALIED_NFT_AMOUNT");
         _nftTotalCollateral[loan.nftAsset] -= 1;
 
-        IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), _msgSender(), loan.nftTokenId);
+        IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), initiator, loan.nftTokenId);
 
         for (uint256 i = 0; i < _userLoans[initiator].length; i++) {
             if (_userLoans[initiator][i] == loanId) {
@@ -181,9 +181,9 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
         require(_nftTotalCollateral[loan.nftAsset] >= 1, "LP_INVALIED_NFT_AMOUNT");
         _nftTotalCollateral[loan.nftAsset] -= 1;
         if (isTransfer) {
-            IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), _msgSender(), loan.nftTokenId);
+            IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), initiator, loan.nftTokenId);
         }
-        IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), _msgSender(), loan.nftTokenId);
+        IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), initiator, loan.nftTokenId);
 
         for (uint256 i = 0; i < _userLoans[initiator].length; i++) {
             if (_userLoans[initiator][i] == loanId) {

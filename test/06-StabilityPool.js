@@ -61,7 +61,7 @@ describe("StabilityPool", function () {
         //than we need to add asset
         await NFTOracleToken.connect(owner).addAsset(gameItem.address,"solidity","s","s.com",1);
         //than we need to set the price of the nft
-        await NFTOracleToken.connect(owner).setAssetData( gameItem.address ,10000, 200, 19);
+        await NFTOracleToken.connect(owner).setAssetData( gameItem.address ,100000, 200, 19);
         //than we get nft price
         const assetData = await NFTOracleToken.connect(owner).getAssetPrice( gameItem.address );
         console.log("assetData: " + assetData);
@@ -92,14 +92,21 @@ describe("StabilityPool", function () {
         //withdraw NFTUSD
         await StabilityPoolToken.connect(address1).withdraw(8);
         console.log("NFTUSD total deposit: ",await StabilityPoolToken.getTotalNFTUSDDeposits())
-        //repay NFTUSD
-        await StabilityPoolToken.connect(address1).repay(gameItem.address, receipt1.events[0].args[2].toNumber() ,50);
 
+        const debt = await StabilityPoolToken.getAllLoanMessage(await address1.getAddress())
+        console.log("debt: ",debt);
+        //repay NFTUSD
+        await StabilityPoolToken.connect(address1).repay(gameItem.address, receipt1.events[0].args[2].toNumber() ,90);
+
+        const ownerOf = await gameItem.ownerOf(receipt1.events[0].args[2].toNumber());
+        console.log("ownerOf: " + ownerOf);
+        console.log(await address1.getAddress());
         console.log("nftusd balance of address1: ",await NFTUSDToken.balanceOf(await address1.getAddress()))
         const loanids = await StabilityPoolToken.getLoanIds(await address1.getAddress())
         console.log("return loanid",loanids[0])
         const loan = await StabilityPoolToken.getLoanCollateralAndReserve(loanids[0])
         console.log("return loan",loan)
+
         const totalNDL = await StabilityPoolToken.getTotalExtractionFee()
         console.log("getTotalExtractionFee:",totalNDL)
 
