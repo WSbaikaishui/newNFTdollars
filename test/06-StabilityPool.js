@@ -61,7 +61,7 @@ describe("StabilityPool", function () {
         //than we need to add asset
         await NFTOracleToken.connect(owner).addAsset(gameItem.address,"solidity","s","s.com",1);
         //than we need to set the price of the nft
-        await NFTOracleToken.connect(owner).setAssetData( gameItem.address ,1000000000, 20000, 19);
+        await NFTOracleToken.connect(owner).setAssetData( gameItem.address ,100000, 20, 2900);
         //than we get nft price
         const assetData = await NFTOracleToken.connect(owner).getAssetPrice( gameItem.address );
         console.log("assetData: " + assetData);

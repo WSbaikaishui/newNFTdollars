@@ -50,8 +50,8 @@ async function main() {
     await nftoracle.setAssetData(
         "0xE2AF2a4CEb57B6b7BfBE350e9daC59be9d402F1A",
         100000,
-        29,
-        19)
+        20,
+        2900)
     console.log("NFTOracleToken is setAssetData successfully")
 
 
