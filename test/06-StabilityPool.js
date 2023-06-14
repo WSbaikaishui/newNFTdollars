@@ -61,7 +61,7 @@ describe("StabilityPool", function () {
         //than we need to add asset
         await NFTOracleToken.connect(owner).addAsset(gameItem.address,"solidity","s","s.com",1);
         //than we need to set the price of the nft
-        await NFTOracleToken.connect(owner).setAssetData( gameItem.address ,100000, 200, 19);
+        await NFTOracleToken.connect(owner).setAssetData( gameItem.address ,1000000000, 20000, 19);
         //than we get nft price
         const assetData = await NFTOracleToken.connect(owner).getAssetPrice( gameItem.address );
         console.log("assetData: " + assetData);
@@ -78,19 +78,19 @@ describe("StabilityPool", function () {
         // await StabilityPoolToken.sendNDL(await address1.getAddress(),10000000)
 
         console.log("StabilityPoolToken sendNDL successfully")
-        await StabilityPoolToken.connect(address1).borrow(await address1.getAddress(),100,gameItem.address, receipt1.events[0].args[2].toNumber(), await address1.getAddress());
-
+        await StabilityPoolToken.connect(address1).borrow(await address1.getAddress(),100000000,gameItem.address, receipt1.events[0].args[2].toNumber(), await address1.getAddress());
+        console.log("nftOracle final price: ",await NFTOracleToken.getFinalPrice(gameItem.address))
 
         console.log("nftusd balance of address1: ",await NFTUSDToken.balanceOf(await address1.getAddress()))
         console.log("nftusd balance of StabilityPoolToken: ",await NFTUSDToken.balanceOf(StabilityPoolToken.address))
         console.log("NDL balance of address1: ",await NDLToken.balanceOf(await address1.getAddress()))
 
         //deposit NFTUSD
-        await StabilityPoolToken.connect(address1).deposit(8);
+        await StabilityPoolToken.connect(address1).deposit(80000);
         console.log("NFTUSD total deposit: ",await StabilityPoolToken.getTotalNFTUSDDeposits())
 
         //withdraw NFTUSD
-        await StabilityPoolToken.connect(address1).withdraw(8);
+        await StabilityPoolToken.connect(address1).withdraw(80000);
         console.log("NFTUSD total deposit: ",await StabilityPoolToken.getTotalNFTUSDDeposits())
 
         const debt = await StabilityPoolToken.getAllLoanMessage(await address1.getAddress())

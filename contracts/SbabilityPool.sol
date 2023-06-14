@@ -115,9 +115,9 @@ contract StabilityPool is
             ndlToken = INDLToken(_ndlToken);
             nftOracle = INFTOracle(_nftOracle);
             poolLoan = ILoanPool(_poolLoans);
-            percentBorrow = 9*1000;//percent 90%;
-            borrowFee = 400; //percent 4%
-            redemptionFee = 200; //percent 2%
+            percentBorrow = 9*1e5;//percent 90%;
+            borrowFee = 4e4; //percent 4%
+            redemptionFee = 2e4; //percent 2%
             _renounceOwnership();
             addReward(_ndlToken,1);
             addReward(_nftUSDToken,1);
@@ -227,9 +227,9 @@ contract StabilityPool is
         );
         nftusdToken.burn(
             address(this),
-         repayAmount.percentMul(1e4 - percentBorrow)
+         repayAmount.percentMul(1e6 - percentBorrow)
         );
-        totalSecurityDeposit -=  repayAmount.percentMul(1e4 - percentBorrow);
+        totalSecurityDeposit -=  repayAmount.percentMul(1e6 - percentBorrow);
         totalExtractionFee += repayAmount.percentMul(redemptionFee);
         return (repayAmount, !isUpdate);
     }
@@ -275,7 +275,7 @@ contract StabilityPool is
             ndlToken.sendNDLToPool(initiator,loan.amount.percentMul(borrowFee));
             notifyRewardAmount(address(ndlToken),loan.amount.percentMul(borrowFee));
             totalExtractionFee += loan.amount.percentMul(borrowFee);
-            totalSecurityDeposit = totalSecurityDeposit - loan.amount.percentMul(1e4-percentBorrow);
+            totalSecurityDeposit = totalSecurityDeposit - loan.amount.percentMul(1e6-percentBorrow);
 
         }else{
             poolLoan.liquidateLoan(
@@ -300,8 +300,8 @@ contract StabilityPool is
             ndlToken.sendNDLToPool(initiator,userBalance.percentMul(borrowFee));
             notifyRewardAmount(address(ndlToken),userBalance.percentMul(borrowFee));
             totalExtractionFee += userBalance.percentMul(borrowFee);
-            notifyRewardAmount(address(nftusdToken),(loan.amount - nftDebtPrice).percentMul(1e4-percentBorrow));
-            totalSecurityDeposit = totalSecurityDeposit - (loan.amount - nftDebtPrice).percentMul(1e4-percentBorrow);
+            notifyRewardAmount(address(nftusdToken),(loan.amount - nftDebtPrice).percentMul(1e6-percentBorrow));
+            totalSecurityDeposit = totalSecurityDeposit - (loan.amount - nftDebtPrice).percentMul(1e6-percentBorrow);
         }
         return 0;
     }

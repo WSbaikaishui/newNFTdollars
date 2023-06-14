@@ -224,7 +224,7 @@ contract NFTOracle is  INFTOracle, Initializable, OwnableUpgradeable, BlockConte
         uint256  nftAverageSales;
         uint256  nftfloorPrice;
         (nftfloorPrice, nftvolatility, nftAverageSales) = getAssetPrice(_nftContract);
-        collectionScore = 1e4- nftvolatility + 3 * nftAverageSales;
+        collectionScore = 1e6- nftvolatility + 30 * nftAverageSales;
         nftDebtPrice = nftfloorPrice.percentMul(collectionScore) * 1e16 ;
         return nftDebtPrice;
     }
