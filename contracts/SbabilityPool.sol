@@ -17,6 +17,7 @@ import "./interfaces/ILoanPool.sol";
 import "./libraries/math/PercentageMath.sol";
 import "./interfaces/INFTUSDToken.sol";
 import "./interfaces/INDLToken.sol";
+import "./dataType.sol";
 /**
  * @title LendPool contract
  * @dev Main point of interaction with an Bend protocol's market
@@ -162,7 +163,6 @@ contract StabilityPool is
             require(amount > 0, "Errors.VL_INVALID_AMOUNT");
             address initiator = _msgSender();
             uint256 loanId = poolLoan.getCollateralLoanId(nftAsset, nftTokenId);
-//            uint256 totalSupply = IERC721EnumerableUpgradeable(nftAsset).totalSupply();
 
             uint256  nftPrice = nftOracle.getFinalPrice(nftAsset);
             require(nftPrice != 0,"no such nft supplyed");
@@ -283,12 +283,14 @@ contract StabilityPool is
                 loan.amount,
                 false
             );
+//            string memory nftName = nftOracle.getAssetName(nftAsset);
             poolLoan.createLoan(
                 initiator,
-                    initiator,
+                initiator,
                 nftAsset,
                 nftTokenId,
-                    nftDebtPrice
+
+                nftDebtPrice
             );
             nftusdToken.mint(
                 initiator,
@@ -326,16 +328,15 @@ contract StabilityPool is
         return poolLoan.getLoanCollateralAndReserve(loanId);
     }
 
-    function getAllLoanMessage(address user) external view returns (uint256[] memory loanIds, address[] memory nftAssets, uint256[] memory nftTokenIds, uint256[] memory amounts) {
-        loanIds = poolLoan.getLoanIds(user);
-        nftAssets = new address[](loanIds.length);
-        nftTokenIds = new uint256[](loanIds.length);
-        amounts = new uint256[](loanIds.length);
-        for (uint256 i = 0; i < loanIds.length; i++) {
-            (nftAssets[i], nftTokenIds[i], amounts[i]) = poolLoan.getLoanCollateralAndReserve(loanIds[i]);
-        }
-        return (loanIds, nftAssets, nftTokenIds, amounts);
-    }
+//    function getAllLoanMessage(address user) external view returns (DataTypes.LoanData[] memory loanData) {
+//
+//        uint256[] memory  loanIds = poolLoan.getLoanIds(user);
+//        loanData = new DataTypes.LoanData[](loanIds.length);
+//        for (uint256 i = 0; i < loanIds.length; i++) {
+//            loanData[i] = poolLoan.getLoan(loanIds[i]);
+//        }
+//        return loanData;
+//    }
 
     function onERC721Received(
         address operator,

@@ -102,10 +102,10 @@ describe("StabilityPool", function () {
         console.log("ownerOf: " + ownerOf);
         console.log(await address1.getAddress());
         console.log("nftusd balance of address1: ",await NFTUSDToken.balanceOf(await address1.getAddress()))
-        const loanids = await StabilityPoolToken.getLoanIds(await address1.getAddress())
-        console.log("return loanid",loanids[0])
-        const loan = await StabilityPoolToken.getLoanCollateralAndReserve(loanids[0])
-        console.log("return loan",loan)
+        // const loanids = await StabilityPoolToken.getLoanIds(await address1.getAddress())
+        // console.log("return loanid",loanids[0])
+        // const loan = await StabilityPoolToken.getLoanCollateralAndReserve(loanids[0])
+        // console.log("return loan",loan)
 
         const totalNDL = await StabilityPoolToken.getTotalExtractionFee()
         console.log("getTotalExtractionFee:",totalNDL)

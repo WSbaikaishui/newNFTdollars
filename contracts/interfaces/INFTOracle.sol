@@ -27,4 +27,6 @@ interface INFTOracle {
     function setTwapInterval(uint256 _twapInterval) external;
 
     function getFinalPrice(address _nftContract) external view returns (uint256);
+
+    function getAssetName(address _nftContract) external view returns (string memory);
 }

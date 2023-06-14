@@ -55,6 +55,8 @@ struct LoanData {
     address borrower;
     //address of nft asset token
     address nftAsset;
+    //the name of nft token
+    string nftName;
     //the id of nft token
     uint256 nftTokenId;
     //scaled borrow amount. Expressed in ray
@@ -62,7 +64,6 @@ struct LoanData {
     //bidder address of first bid
     address liquityAddress;
   }
-
 
 
 }

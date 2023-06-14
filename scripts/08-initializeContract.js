@@ -19,6 +19,7 @@ async function main() {
     await ndl.initialize();
     console.log("Ndl is initialized successfully")
     await ndl.initializePool(addressList["StabilityPool"]);
+    await ndl.transfer("0xc7ae166404DfA77D2AF214e04Bb8B930274A02b8", "10000000000000000000000");
     console.log("NDLToken is initializePool successfully  0x40ebF7a33f8FAb287B9616F54d45fC6371c6f162")
 
     //initial nftoracle token

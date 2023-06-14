@@ -209,6 +209,11 @@ contract NFTOracle is  INFTOracle, Initializable, OwnableUpgradeable, BlockConte
         }
     }
 
+    function getAssetName(address _nftContract) external view override returns (string memory) {
+        require(isExistedKey(_nftContract), "NFTOracle: key not existed");
+        return nftBaseDataMap[_nftContract].name;
+    }
+
     function getFinalPrice(address _nftContract) external view override returns (uint256) {
         require(isExistedKey(_nftContract), "NFTOracle: key not existed");
         uint256 len = getPriceFeedLength(_nftContract);

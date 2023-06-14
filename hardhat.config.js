@@ -71,6 +71,7 @@ module.exports = {
     bnbtest: {
       url: process.env.BNBTest_URL || "",
       chainId:97,
+
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
 
     }
