@@ -60,6 +60,7 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
         address onBehalfOf,
         address nftAsset,
         uint256 nftTokenId,
+        string memory nftName,
         uint256 amount
     ) external override onlyStabilityPool returns (uint256) {
         require(_nftToLoanIds[nftAsset][nftTokenId] == 0, "Errors.LP_NFT_HAS_USED_AS_COLLATERAL");
@@ -78,6 +79,7 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
         loanData.state = DataTypes.LoanState.Active;
         loanData.borrower = onBehalfOf;
         loanData.nftAsset = nftAsset;
+        loanData.nftName = nftName;
         loanData.nftTokenId = nftTokenId;
         loanData.amount = amount;
 

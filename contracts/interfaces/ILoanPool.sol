@@ -77,6 +77,7 @@ interface ILoanPool {
     address onBehalfOf,
     address nftAsset,
     uint256 nftTokenId,
+  string memory nftName,
     uint256 amount
   ) external returns (uint256);
 

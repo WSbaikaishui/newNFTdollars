@@ -169,7 +169,8 @@ contract StabilityPool is
             require(nftPrice > amount,"borrow amount is to high for this NFT");
 
             if (loanId == 0) {
-                loanId = poolLoan.createLoan( initiator, onBehalfOf, nftAsset, nftTokenId, amount);
+                string memory nftName = nftOracle.getAssetName(nftAsset);
+                loanId = poolLoan.createLoan( initiator, onBehalfOf, nftAsset, nftTokenId,nftName, amount);
             } else {
                 poolLoan.updateLoan(initiator, loanId, amount, true);
             }
@@ -283,13 +284,13 @@ contract StabilityPool is
                 loan.amount,
                 false
             );
-//            string memory nftName = nftOracle.getAssetName(nftAsset);
+            string memory nftName = nftOracle.getAssetName(nftAsset);
             poolLoan.createLoan(
                 initiator,
                 initiator,
                 nftAsset,
                 nftTokenId,
-
+                nftName,
                 nftDebtPrice
             );
             nftusdToken.mint(
@@ -328,15 +329,15 @@ contract StabilityPool is
         return poolLoan.getLoanCollateralAndReserve(loanId);
     }
 
-//    function getAllLoanMessage(address user) external view returns (DataTypes.LoanData[] memory loanData) {
-//
-//        uint256[] memory  loanIds = poolLoan.getLoanIds(user);
-//        loanData = new DataTypes.LoanData[](loanIds.length);
-//        for (uint256 i = 0; i < loanIds.length; i++) {
-//            loanData[i] = poolLoan.getLoan(loanIds[i]);
-//        }
-//        return loanData;
-//    }
+    function getAllLoanMessage(address user) external view returns (DataTypes.LoanData[] memory loanData) {
+
+        uint256[] memory  loanIds = poolLoan.getLoanIds(user);
+        loanData = new DataTypes.LoanData[](loanIds.length);
+        for (uint256 i = 0; i < loanIds.length; i++) {
+            loanData[i] = poolLoan.getLoan(loanIds[i]);
+        }
+        return loanData;
+    }
 
     function onERC721Received(
         address operator,
