@@ -72,26 +72,6 @@ interface IStabilityPool {
         uint256 loanId
     );
 
-    /**
-     * @dev Emitted when a borrower's loan is auctioned.
-   * @param user The address of the user initiating the auction
-   * @param reserve The address of the underlying asset of the reserve
-   * @param bidPrice The price of the underlying reserve given by the bidder
-   * @param nftAsset The address of the underlying NFT used as collateral
-   * @param nftTokenId The token id of the underlying NFT used as collateral
-   * @param onBehalfOf The address that will be getting the NFT
-   * @param loanId The loan ID of the NFT loans
-   **/
-    event Auction(
-        address user,
-        address indexed reserve,
-        uint256 bidPrice,
-        address indexed nftAsset,
-        uint256 nftTokenId,
-        address onBehalfOf,
-        address indexed borrower,
-        uint256 loanId
-    );
 
     /**
      * @dev Emitted on redeem()
@@ -147,6 +127,12 @@ interface IStabilityPool {
    */
     event PausedTimeUpdated(uint256 startTime, uint256 durationTime);
 
+
+
+    event Extraction(
+        address indexed initiator,
+        address indexed onBehalfOf,
+        uint256 extractionAmount);
     /**
      * @dev Emitted when the state of a reserve is updated. NOTE: This event is actually declared
    * in the ReserveLogic library and emitted in the updateInterestRates() function. Since the function is internal,

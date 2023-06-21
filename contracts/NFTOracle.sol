@@ -41,6 +41,7 @@ contract NFTOracle is  INFTOracle, Initializable, OwnableUpgradeable, BlockConte
         string name;
         string symbol;
         string baseURI;
+        uint8 nftType;
     }
 
     address public priceFeedAdmin;
@@ -106,11 +107,13 @@ contract NFTOracle is  INFTOracle, Initializable, OwnableUpgradeable, BlockConte
         }
     }
 
-    function addAsset(address _nftContract,
+    function addAsset(
+        address _nftContract,
         string memory _name,
         string memory _symbol,
         string memory _url,
-        uint8 nftType) external onlyOwner {
+        uint8 nftType
+    ) external onlyOwner {
         _addAsset(_nftContract, _name, _symbol, _url, nftType);
     }
 
@@ -126,6 +129,7 @@ contract NFTOracle is  INFTOracle, Initializable, OwnableUpgradeable, BlockConte
         nftBaseDataMap[_nftContract].name = _name;
         nftBaseDataMap[_nftContract].symbol = _symbol;
         nftBaseDataMap[_nftContract].baseURI = _url;
+        nftBaseDataMap[_nftContract].nftType = nftType;
         emit AssetAdded(_nftContract);
     }
 
@@ -209,12 +213,16 @@ contract NFTOracle is  INFTOracle, Initializable, OwnableUpgradeable, BlockConte
         }
     }
 
-    function getAssetName(address _nftContract) external view override returns (string memory) {
+    function getAssetType(address _nftContract) external view  returns (uint8) {
+        require(isExistedKey(_nftContract), "NFTOracle: key not existed");
+        return nftBaseDataMap[_nftContract].nftType;
+    }
+    function getAssetName(address _nftContract) external view  returns (string memory) {
         require(isExistedKey(_nftContract), "NFTOracle: key not existed");
         return nftBaseDataMap[_nftContract].name;
     }
 
-    function getFinalPrice(address _nftContract) external view override returns (uint256) {
+    function getFinalPrice(address _nftContract) external view  returns (uint256) {
         require(isExistedKey(_nftContract), "NFTOracle: key not existed");
         uint256 len = getPriceFeedLength(_nftContract);
         require(len > 0, "NFTOracle: no price data");

@@ -58,6 +58,10 @@ describe("StabilityPool", function () {
        //first we need to mint a nft
         const newItemId1 = await gameItem.connect(address1).awardItem(await address1.getAddress(), "tokenURI");
         const receipt1 = await newItemId1.wait();
+
+        //first we need to mint a nft
+        const newItemId2 = await gameItem.connect(address1).awardItem(await address1.getAddress(), "tokenURI");
+        const receipt2 = await newItemId2.wait();
         //than we need to add asset
         await NFTOracleToken.connect(owner).addAsset(gameItem.address,"solidity","s","s.com",1);
         //than we need to set the price of the nft
@@ -68,18 +72,24 @@ describe("StabilityPool", function () {
 
         //than we need to approve the nft to the StabilityPoolToken
         await gameItem.connect(address1).approve(LoanPoolToken.address, receipt1.events[0].args[2].toNumber());
+        await gameItem.connect(address1).approve(LoanPoolToken.address, receipt2.events[0].args[2].toNumber());
         console.log("approve successfully")
         console.log("Stabilitypooltoken ",await NDLToken.balanceOf(await owner.getAddress()))
 
         //transfer some NDL to address1, this is the fee
-        await NDLToken.connect(owner).transfer(await address1.getAddress(),1000000000)
+        await NDLToken.connect(owner).transfer(await address1.getAddress(),"1000000000000000000000")
         console.log("Stabilitypooltoken ",await NDLToken.balanceOf(StabilityPoolToken.address))
         //than we can borrow NFTUSD
         // await StabilityPoolToken.sendNDL(await address1.getAddress(),10000000)
 
         console.log("StabilityPoolToken sendNDL successfully")
-        await StabilityPoolToken.connect(address1).borrow(await address1.getAddress(),100000000,gameItem.address, receipt1.events[0].args[2].toNumber(), await address1.getAddress());
+
+
+        await StabilityPoolToken.connect(address1).LockedNFT(gameItem.address, receipt1.events[0].args[2].toNumber(),false, 100000000);
+        await StabilityPoolToken.connect(address1).LockedNFT(gameItem.address, receipt2.events[0].args[2].toNumber(),false, 100000000);
         console.log("nftOracle final price: ",await NFTOracleToken.getFinalPrice(gameItem.address))
+
+        await StabilityPoolToken.connect(address1).extraction(await address1.getAddress(), "998700000000000000000");
 
         console.log("nftusd balance of address1: ",await NFTUSDToken.balanceOf(await address1.getAddress()))
         console.log("nftusd balance of StabilityPoolToken: ",await NFTUSDToken.balanceOf(StabilityPoolToken.address))
@@ -93,13 +103,25 @@ describe("StabilityPool", function () {
         await StabilityPoolToken.connect(address1).withdraw(80000);
         console.log("NFTUSD total deposit: ",await StabilityPoolToken.getTotalNFTUSDDeposits())
 
-        const debt = await StabilityPoolToken.getAllLoanMessage(await address1.getAddress())
+        const debt = await StabilityPoolToken.healthFactor(await address1.getAddress())
         console.log("debt: ",debt);
         //repay NFTUSD
-        await StabilityPoolToken.connect(address1).repay(gameItem.address, receipt1.events[0].args[2].toNumber() ,90);
+        await StabilityPoolToken.connect(address1).repay(await address1.getAddress(),19999);
+
+
+        //redeemNFT
+        await StabilityPoolToken.connect(address2).redeemNFT(gameItem.address, receipt1.events[0].args[2].toNumber(),0);
+
+
+        const debt2 = await StabilityPoolToken.healthFactor(await address1.getAddress())
+        console.log("debt after repay: ",debt2);
+
+
 
         const ownerOf = await gameItem.ownerOf(receipt1.events[0].args[2].toNumber());
-        console.log("ownerOf: " + ownerOf);
+        console.log("nft1 ownerOf: " + ownerOf);
+        const ownerof2 = await gameItem.ownerOf(receipt2.events[0].args[2].toNumber());
+        console.log("nft2 ownerOf: " + ownerof2);
         console.log(await address1.getAddress());
         console.log("nftusd balance of address1: ",await NFTUSDToken.balanceOf(await address1.getAddress()))
         // const loanids = await StabilityPoolToken.getLoanIds(await address1.getAddress())

@@ -16,24 +16,12 @@ interface ILoanPool {
    */
   event LoanCreated(
     address indexed user,
-    address indexed onBehalfOf,
     uint256 indexed loanId,
     address nftAsset,
-    uint256 nftTokenId,
-    uint256 amount
+    uint256 nftTokenId
+
   );
 
-  /**
-   * @dev Emitted when a loan is updated
-   * @param user The address initiating the action
-   */
-  event LoanUpdated(
-    address indexed user,
-    uint256 indexed loanId,
-    address nftAsset,
-    uint256 nftTokenId,
-    uint256 amountAdded
-  );
 
   /**
    * @dev Emitted when a loan is repaid by the borrower
@@ -43,9 +31,7 @@ interface ILoanPool {
     address indexed user,
     uint256 indexed loanId,
     address nftAsset,
-    uint256 nftTokenId,
-    uint256 amount
-
+    uint256 nftTokenId
   );
 
 
@@ -59,42 +45,40 @@ interface ILoanPool {
     address indexed user,
     uint256 indexed loanId,
     address nftAsset,
-    uint256 nftTokenId,
-
-    uint256 amount
+    uint256 nftTokenId
 
   );
 
+  event BorrowAmountUpdated(
+    address indexed initiator,
+    uint256 amount
+  );
 
+  event SecurityDepositUpdated(
+    address indexed initiator,
+    uint256 amount
+  );
+
+  event ThresholdUpdated(
+    uint256 loanID,
+    uint256 threshold
+  );
 
   /**
    * @dev Create store a loan object with some params
    * @param initiator The address of the user initiating the borrow
-   * @param onBehalfOf The address receiving the loan
+
    */
   function createLoan(
     address initiator,
-    address onBehalfOf,
     address nftAsset,
     uint256 nftTokenId,
   string memory nftName,
-    uint256 amount
+    bool isUpLayer,
+    uint256 threshold,
+    bool isTransfer
   ) external returns (uint256);
 
-  /**
-   * @dev Update the given loan with some params
-   *
-   * Requirements:
-   *  - The caller must be a holder of the loan
-   *  - The loan must be in state Active
-   * @param initiator The address of the user initiating the borrow
-   */
-  function updateLoan(
-    address initiator,
-    uint256 loanId,
-    uint256 amountAdded,
-    bool isAdd
-  ) external;
 
   /**
    * @dev Repay the given loan
@@ -110,14 +94,15 @@ interface ILoanPool {
    */
   function repayLoan(
     address initiator,
-    uint256 loanId,
-    uint256 amount
+    uint256 loanId
+
   ) external;
 
 
 
 
   function getLoanIds(address user) external view  returns (uint256[] memory);
+
 
 
   /**
@@ -133,12 +118,10 @@ interface ILoanPool {
    */
   function liquidateLoan(
     address initiator,
+  address liquidator,
     uint256 loanId,
-    uint256 borrowAmount,
     bool isTransfer
   ) external;
-
-
 
 
 
@@ -153,12 +136,16 @@ interface ILoanPool {
     view
     returns (
       address nftAsset,
-      uint256 nftTokenId,
-    uint256 amount
+      uint256 nftTokenId
     );
 
+  function updateSecurityDeposit(address initiator,uint256 amount,bool isAdd) external;
+  function updateBorrowAmount(address initiator,uint256 amount,bool isAdd) external;
+  function updateThreshold( uint256 loanID,uint256 threshold) external;
+  function getBorrowAmount(address initiator) external view returns(uint256);
+  function getSecurityDeposit(address initiator) external view returns(uint256);
 
-  function getNftCollateralAmount(address nftAsset) external view returns (uint256);
+  function getNftCollateralAmount(address nftAsset) external view returns(uint256);
 
-  function getUserNftCollateralAmount(address user, address nftAsset) external view returns (uint256);
+  function getUserNftCollateralAmount(address user, address nftAsset) external view returns(uint256);
 }

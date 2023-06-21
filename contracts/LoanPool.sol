@@ -26,7 +26,8 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
     mapping(address => mapping(uint256 => uint256)) private _nftToLoanIds;
     mapping(address => uint256) private _nftTotalCollateral;
     mapping(address => mapping(address => uint256)) private _userNftCollateral;
-
+    mapping(address => uint256) private _userTotalCollateral;
+    mapping(address => uint256) private _userSecurityDeposit;
     mapping(address => uint256[]) private _userLoans;
 
 
@@ -52,16 +53,17 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
 
 //        emit Initialized(address(_getStabilityPool()));
     }
-
+//
 
 
     function createLoan(
         address initiator,
-        address onBehalfOf,
         address nftAsset,
         uint256 nftTokenId,
         string memory nftName,
-        uint256 amount
+        bool isUpLayer,
+        uint256 threshold,
+        bool isTransfer
     ) external override onlyStabilityPool returns (uint256) {
         require(_nftToLoanIds[nftAsset][nftTokenId] == 0, "Errors.LP_NFT_HAS_USED_AS_COLLATERAL");
 
@@ -71,59 +73,61 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
         _nftToLoanIds[nftAsset][nftTokenId] = loanId;
 
         // transfer underlying NFT asset to pool
-        IERC721Upgradeable(nftAsset).safeTransferFrom(initiator, address(this), nftTokenId);
+        if (isTransfer){
+            IERC721Upgradeable(nftAsset).safeTransferFrom(initiator, address(this), nftTokenId);
+        }
 
         // Save Info
         DataTypes.LoanData storage loanData = _loans[loanId];
         loanData.loanId = loanId;
         loanData.state = DataTypes.LoanState.Active;
-        loanData.borrower = onBehalfOf;
+        loanData.borrower = initiator;
         loanData.nftAsset = nftAsset;
         loanData.nftName = nftName;
         loanData.nftTokenId = nftTokenId;
-        loanData.amount = amount;
+        loanData.isUpLayer = isUpLayer;
+        loanData.threshold = threshold;
 
-        _userNftCollateral[onBehalfOf][nftAsset] += 1;
+        _userNftCollateral[initiator][nftAsset] += 1;
 
         _nftTotalCollateral[nftAsset] += 1;
         _userLoans[initiator].push(loanId);
-        emit LoanCreated(initiator, onBehalfOf, loanId, nftAsset, nftTokenId, amount);
+        emit LoanCreated(initiator,  loanId, nftAsset, nftTokenId);
         return (loanId);
 }
 
 
-    function updateLoan(
-        address initiator,
-        uint256 loanId,
-        uint256 amountAdded,
-        bool isAdd
-    ) external override onlyStabilityPool {
-    // Must use storage to change state
-        DataTypes.LoanData storage loan = _loans[loanId];
-
-        // Ensure valid loan state
-        require(loan.state == DataTypes.LoanState.Active, "LPL_INVALID_LOAN_STATE");
-        if (isAdd){
-            loan.amount += amountAdded;
-        }else{
-            loan.amount -= amountAdded;
-        }
-
-
-        emit LoanUpdated(
-        initiator,
-        loanId,
-        loan.nftAsset,
-        loan.nftTokenId,
-        amountAdded
-        );
-    }
+//    function updateLoan(
+//        address initiator,
+//        uint256 loanId,
+//        uint256 amountAdded,
+//        bool isAdd
+//    ) external override onlyStabilityPool {
+//    // Must use storage to change state
+//        DataTypes.LoanData storage loan = _loans[loanId];
+//
+//        // Ensure valid loan state
+//        require(loan.state == DataTypes.LoanState.Active, "LPL_INVALID_LOAN_STATE");
+//        if (isAdd){
+//            loan.amount += amountAdded;
+//        }else{
+//            loan.amount -= amountAdded;
+//        }
+//
+//
+//        emit LoanUpdated(
+//        initiator,
+//        loanId,
+//        loan.nftAsset,
+//        loan.nftTokenId,
+//        amountAdded
+//        );
+//    }
 
 
     function repayLoan(
         address initiator,
-        uint256 loanId,
-        uint256 amount
+        uint256 loanId
     ) external override onlyStabilityPool {
     // Must use storage to change state
     DataTypes.LoanData storage loan = _loans[loanId];
@@ -153,15 +157,15 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
                 break;
             }
         }
-        emit LoanRepaid(initiator, loanId, loan.nftAsset, loan.nftTokenId,  amount);
+        emit LoanRepaid(initiator, loanId, loan.nftAsset, loan.nftTokenId);
 
     }
 
 
     function liquidateLoan(
         address initiator,
+        address liquidator,
         uint256 loanId,
-        uint256 borrowAmount,
         bool isTransfer
     ) external override onlyStabilityPool {
         // Must use storage to change state
@@ -183,9 +187,9 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
         require(_nftTotalCollateral[loan.nftAsset] >= 1, "LP_INVALIED_NFT_AMOUNT");
         _nftTotalCollateral[loan.nftAsset] -= 1;
         if (isTransfer) {
-            IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), initiator, loan.nftTokenId);
+            IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), liquidator, loan.nftTokenId);
         }
-        IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), initiator, loan.nftTokenId);
+//        IERC721Upgradeable(loan.nftAsset).safeTransferFrom(address(this), initiator, loan.nftTokenId);
 
         for (uint256 i = 0; i < _userLoans[initiator].length; i++) {
             if (_userLoans[initiator][i] == loanId) {
@@ -198,9 +202,41 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
             initiator,
             loanId,
             loan.nftAsset,
-            loan.nftTokenId,
-            borrowAmount
+            loan.nftTokenId
         );
+    }
+
+    function updateBorrowAmount(address initiator,uint256 amount,bool isAdd) external override onlyStabilityPool {
+        if (isAdd){
+            _userTotalCollateral[initiator] += amount;
+        }else{
+            require(_userTotalCollateral[initiator] >= amount, "LP_INVALIED_USER_TOTAL_COLLATERAL");
+            _userTotalCollateral[initiator] -= amount;
+        }
+        emit BorrowAmountUpdated(initiator, amount);
+    }
+
+    function updateSecurityDeposit(address initiator,uint256 amount,bool isAdd) external override onlyStabilityPool {
+        if (isAdd){
+            _userSecurityDeposit[initiator] += amount;
+        }else{
+            require(_userSecurityDeposit[initiator] >= amount, "LP_INVALIED_USER_SECURITY_DEPOSIT");
+            _userSecurityDeposit[initiator] -= amount;
+        }
+        emit SecurityDepositUpdated(initiator, amount);
+    }
+
+    function getBorrowAmount(address initiator) external view override returns (uint256 amount) {
+        return (_userTotalCollateral[initiator]);
+    }
+
+    function getSecurityDeposit(address initiator) external view override returns (uint256) {
+        return _userSecurityDeposit[initiator];
+    }
+
+    function updateThreshold( uint256 loanID,uint256 threshold) external override onlyStabilityPool {
+        _loans[loanID].threshold = threshold;
+        emit ThresholdUpdated( loanID, threshold);
     }
 
     function onERC721Received(
@@ -233,20 +269,21 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
         return _loans[loanId];
     }
 
+
+
     function getLoanCollateralAndReserve(uint256 loanId)
     external
     view
     override
     returns (
         address nftAsset,
-        uint256 nftTokenId,
-        uint256 amount
+        uint256 nftTokenId
     )
     {
         return (
             _loans[loanId].nftAsset,
-            _loans[loanId].nftTokenId,
-            _loans[loanId].amount
+            _loans[loanId].nftTokenId
+
         );
     }
 

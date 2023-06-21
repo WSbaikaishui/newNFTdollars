@@ -63,7 +63,35 @@ struct LoanData {
     uint256 amount;
     //bidder address of first bid
     address liquityAddress;
+    //the type of this nft;
+    uint8  nftType;
+    //Cross layer NFT can be classified to Reserve layer
+    bool isUpLayer;
+
+    uint256 threshold;
   }
 
+
+    struct ExtractionData {
+        address borrower;
+        uint256 accountDebt;
+        uint256 maxDebt;
+        uint256 amount;
+        uint256 extractionFee;
+        uint256 securityDeposit;
+    }
+
+
+    struct LiquityData{
+        address liquityAddress;
+        address borrower;
+        uint256 price;
+        uint256 userBalance;
+        uint256 borrowDebt;
+        uint256 borrowMaxDebt;
+        uint256 borrowSecurityDeposit;
+        uint256 decreaseAmount;
+        uint256 decreaseSecurityDeposit;
+    }
 
 }

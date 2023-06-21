@@ -29,4 +29,6 @@ interface INFTOracle {
     function getFinalPrice(address _nftContract) external view returns (uint256);
 
     function getAssetName(address _nftContract) external view returns (string memory);
+
+    function getAssetType(address _nftContract) external returns(uint8);
 }

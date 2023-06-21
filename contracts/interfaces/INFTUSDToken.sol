@@ -63,4 +63,5 @@ interface INFTUSDToken is  IERC20 {
 
   function returnFromPool(address poolAddress, address user, uint256 _amount ) external;
 
+  function redeemedTransfer(address _sender, address _receiver, uint256 _amount) external;
 }
