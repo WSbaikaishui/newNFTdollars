@@ -136,7 +136,8 @@ interface ILoanPool {
     view
     returns (
       address nftAsset,
-      uint256 nftTokenId
+      uint256 nftTokenId,
+    bool isUpLayer
     );
 
   function updateSecurityDeposit(address initiator,uint256 amount,bool isAdd) external;

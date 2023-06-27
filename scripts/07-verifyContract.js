@@ -38,7 +38,7 @@ const verify = async (contract,address, constructorArguments) => {
 main()
     .then(() => process.exit(0))
     .catch((error) => {
-            console.error(error)
-            process.exit(1)
-        }
+        console.error(error)
+        process.exit(1)
+    }
     )

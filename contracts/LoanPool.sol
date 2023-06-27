@@ -31,6 +31,7 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
     mapping(address => uint256[]) private _userLoans;
 
 
+
 //    IStabilityPool private _stabilityPool;
     address private _stabilityPoolAddress;
 
@@ -95,34 +96,6 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
         emit LoanCreated(initiator,  loanId, nftAsset, nftTokenId);
         return (loanId);
 }
-
-
-//    function updateLoan(
-//        address initiator,
-//        uint256 loanId,
-//        uint256 amountAdded,
-//        bool isAdd
-//    ) external override onlyStabilityPool {
-//    // Must use storage to change state
-//        DataTypes.LoanData storage loan = _loans[loanId];
-//
-//        // Ensure valid loan state
-//        require(loan.state == DataTypes.LoanState.Active, "LPL_INVALID_LOAN_STATE");
-//        if (isAdd){
-//            loan.amount += amountAdded;
-//        }else{
-//            loan.amount -= amountAdded;
-//        }
-//
-//
-//        emit LoanUpdated(
-//        initiator,
-//        loanId,
-//        loan.nftAsset,
-//        loan.nftTokenId,
-//        amountAdded
-//        );
-//    }
 
 
     function repayLoan(
@@ -277,12 +250,14 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
     override
     returns (
         address nftAsset,
-        uint256 nftTokenId
+        uint256 nftTokenId,
+        bool isUpLayer
     )
     {
         return (
             _loans[loanId].nftAsset,
-            _loans[loanId].nftTokenId
+            _loans[loanId].nftTokenId,
+        _loans[loanId].isUpLayer
 
         );
     }
