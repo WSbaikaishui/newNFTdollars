@@ -18,6 +18,7 @@ interface ILoanPool {
     address indexed user,
     uint256 indexed loanId,
     address nftAsset,
+    string nftName,
     uint256 nftTokenId
 
   );
@@ -31,6 +32,7 @@ interface ILoanPool {
     address indexed user,
     uint256 indexed loanId,
     address nftAsset,
+  string nftName,
     uint256 nftTokenId
   );
 
@@ -45,6 +47,7 @@ interface ILoanPool {
     address indexed user,
     uint256 indexed loanId,
     address nftAsset,
+    string nftName,
     uint256 nftTokenId
 
   );

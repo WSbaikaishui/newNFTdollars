@@ -89,6 +89,8 @@ struct LoanData {
         uint256 userBalance;
         uint256 borrowDebt;
         uint256 borrowMaxDebt;
+        uint256 userIncreaseAmount;
+        uint256 userIncreaseSecurityDeposit;
         uint256 borrowSecurityDeposit;
         uint256 decreaseAmount;
         uint256 decreaseSecurityDeposit;

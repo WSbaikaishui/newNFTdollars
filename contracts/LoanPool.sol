@@ -93,7 +93,7 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
 
         _nftTotalCollateral[nftAsset] += 1;
         _userLoans[initiator].push(loanId);
-        emit LoanCreated(initiator,  loanId, nftAsset, nftTokenId);
+        emit LoanCreated(initiator,  loanId, nftAsset,nftName, nftTokenId);
         return (loanId);
 }
 
@@ -130,7 +130,7 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
                 break;
             }
         }
-        emit LoanRepaid(initiator, loanId, loan.nftAsset, loan.nftTokenId);
+        emit LoanRepaid(initiator, loanId, loan.nftAsset,loan.nftName, loan.nftTokenId);
 
     }
 
@@ -175,6 +175,7 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
             initiator,
             loanId,
             loan.nftAsset,
+            loan.nftName,
             loan.nftTokenId
         );
     }
