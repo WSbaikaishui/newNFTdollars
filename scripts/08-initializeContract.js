@@ -57,23 +57,33 @@ async function main() {
     )
     await tx5.wait();
     console.log("NFTOracleToken is addAsset successfully")
-    await nftoracle.setAssetData(
+    const tx6 = await nftoracle.setAssetData(
         "0xE2AF2a4CEb57B6b7BfBE350e9daC59be9d402F1A",
         100000,
         20,
         2900)
+    await tx6.wait();
     console.log("NFTOracleToken is setAssetData successfully")
 
 
-    await loanPool.initialize(addressList["StabilityPool"]);
+    const tx7 = await loanPool.initialize(addressList["StabilityPool"]);
+    await tx7.wait();
     console.log("LoanPoolToken is initialized successfully")
 
 
 //initial stabilitypool token
-//     const StabilityPool = await ethers.getContractFactory("StabilityPool")
-//     const stabilityPool = StabilityPool.attach(addressList["StabilityPool"]);
-//
-//     await stabilityPool.initialize(nftoracle.address,nftusd.address,ndl.address,loanPool.address);
+    const StabilityPool = await ethers.getContractFactory("StabilityPool")
+    const stabilityPool = StabilityPool.attach(addressList["StabilityPool"]);
+
+   const tx8 =  await stabilityPool.initialize(nftoracle.address,nftusd.address,ndl.address,loanPool.address);
+   await tx8.wait();
+
+   const tx9 = await stabilityPool.setThreshold(1,"5000000000000000000")
+    await tx9.wait();
+   const tx10 = await stabilityPool.setThreshold(2,"1000000000000000000")
+    await tx10.wait();
+    const tx11 = await stabilityPool.setThreshold(3,"15000000000000000000")
+    await tx11.wait();
     console.log("StabilityPoolToken is initialized successfully")
 
 

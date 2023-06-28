@@ -138,9 +138,13 @@ contract StabilityPool is
             percentSecurityDeposit = 1*1e5;//percent 10%
             borrowFee = 4e4; //percent 4%
             redemptionFee = 2e4; //percent 2%
-            _renounceOwnership();
+//            _renounceOwnership();
             addReward(_ndlToken,1);
             addReward(_nftUSDToken,1);
+        }
+
+        function setThreshold(uint8 types,uint256 _threshold) external onlyOwner {
+            _layerThreshold[types] = _threshold;
         }
 
         function getTotalNFTUSDDeposits() external view  returns (uint) {
@@ -473,6 +477,15 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
         }
         return (accountDebt,securityDeposit,totalNFTLocked);
     }
+
+    function getDeposit(uint8 types, address user) external view returns (uint256) {
+        return _layerUserBalance[types][user];
+    }
+
+    function getThreshold(uint8 types) external view returns (uint256) {
+        return _layerThreshold[types];
+    }
+
 
     function getLoanIds(address user) external view returns (uint256[] memory) {
         return poolLoan.getLoanIds(user);
