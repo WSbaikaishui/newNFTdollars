@@ -96,11 +96,11 @@ describe("StabilityPool", function () {
         console.log("NDL balance of address1: ",await NDLToken.balanceOf(await address1.getAddress()))
 
         //deposit NFTUSD
-        await StabilityPoolToken.connect(address1).deposit(80000);
+        await StabilityPoolToken.connect(address1).deposit(0,80000);
         console.log("NFTUSD total deposit: ",await StabilityPoolToken.getTotalNFTUSDDeposits())
 
         //withdraw NFTUSD
-        await StabilityPoolToken.connect(address1).withdraw(80000);
+        await StabilityPoolToken.connect(address1).withdraw(0,80000);
         console.log("NFTUSD total deposit: ",await StabilityPoolToken.getTotalNFTUSDDeposits())
 
         const debt = await StabilityPoolToken.healthFactor(await address1.getAddress())

@@ -192,7 +192,7 @@ contract StabilityPool is
         address initiator = msg.sender;
         loanId = poolLoan.getCollateralLoanId(nftAsset, nftTokenId);
         string memory nftName = nftOracle.getAssetName(nftAsset);
-        require(loanId != 0,"this nft has been locked");
+        require(loanId == 0,"this nft has been locked");
         uint8 nftType = nftOracle.getAssetType(nftAsset);
         if (nftType == 1){
             require(threshold >= 1e6,"threshold must be greater than 100%");
