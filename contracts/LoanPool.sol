@@ -7,6 +7,7 @@ import {DataTypes} from "./dataType.sol";
 import {WadRayMath} from "./libraries/math/WadRayMath.sol";
 import {ILoanPool} from "./interfaces/ILoanPool.sol";
 import {IStabilityPool} from "./interfaces/IStabilityPool.sol";
+import "./utils/Errors.sol";
 
 import {IERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
 import {IERC721ReceiverUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721ReceiverUpgradeable.sol";
@@ -66,7 +67,9 @@ contract LoanPool is Initializable, ILoanPool, ContextUpgradeable, IERC721Receiv
         uint256 threshold,
         bool isTransfer
     ) external override onlyStabilityPool returns (uint256) {
-        require(_nftToLoanIds[nftAsset][nftTokenId] == 0, "Errors.LP_NFT_HAS_USED_AS_COLLATERAL");
+        if (_nftToLoanIds[nftAsset][nftTokenId] != 0){
+            revert NFTHasBeenLocked(nftAsset, nftTokenId, _nftToLoanIds[nftAsset][nftTokenId]);
+        }
 
         uint256 loanId = _loanIdTracker.current();
         _loanIdTracker.increment();

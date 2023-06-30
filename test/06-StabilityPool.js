@@ -62,6 +62,10 @@ describe("StabilityPool", function () {
         //first we need to mint a nft
         const newItemId2 = await gameItem.connect(address1).awardItem(await address1.getAddress(), "tokenURI");
         const receipt2 = await newItemId2.wait();
+
+        const newItemId3 = await gameItem.connect(address2).awardItem(await address2.getAddress(), "tokenURI");
+        const receipt3 = await newItemId3.wait();
+
         //than we need to add asset
         await NFTOracleToken.connect(owner).addAsset(gameItem.address,"solidity","s","s.com",1);
         //than we need to set the price of the nft
@@ -73,6 +77,7 @@ describe("StabilityPool", function () {
         //than we need to approve the nft to the StabilityPoolToken
         await gameItem.connect(address1).approve(LoanPoolToken.address, receipt1.events[0].args[2].toNumber());
         await gameItem.connect(address1).approve(LoanPoolToken.address, receipt2.events[0].args[2].toNumber());
+        await gameItem.connect(address2).approve(LoanPoolToken.address, receipt3.events[0].args[2].toNumber());
         console.log("approve successfully")
         console.log("Stabilitypooltoken ",await NDLToken.balanceOf(await owner.getAddress()))
 
@@ -85,11 +90,25 @@ describe("StabilityPool", function () {
         console.log("StabilityPoolToken sendNDL successfully")
 
 
-        await StabilityPoolToken.connect(address1).LockedNFT(gameItem.address, receipt1.events[0].args[2].toNumber(),false, 100000000);
-        await StabilityPoolToken.connect(address1).LockedNFT(gameItem.address, receipt2.events[0].args[2].toNumber(),false, 100000000);
+
+
+       const tx1 = await StabilityPoolToken.connect(address1).LockedNFT(gameItem.address, receipt1.events[0].args[2].toNumber(),false, 1000000);
+        await tx1.wait();
+       const tx2 =  await StabilityPoolToken.connect(address1).LockedNFT(gameItem.address, receipt2.events[0].args[2].toNumber(),false, 1000000);
+       await tx2.wait();
+       const tx3 = await StabilityPoolToken.connect(address2).LockedNFT(gameItem.address, receipt3.events[0].args[2].toNumber(),false, 1000000);
+       await tx3.wait();
         console.log("nftOracle final price: ",await NFTOracleToken.getFinalPrice(gameItem.address))
 
-        await StabilityPoolToken.connect(address1).extraction(await address1.getAddress(), "998700000000000000000");
+        // await StabilityPoolToken.connect(address1).LockedNFT(gameItem.address, receipt1.events[0].args[2].toNumber(),false, 100000000);
+
+        const loanID1 = await LoanPoolToken.connect(address1).getCollateralLoanId(gameItem.address, receipt1.events[0].args[2].toNumber());
+        const loanID2 = await LoanPoolToken.connect(address1).getCollateralLoanId(gameItem.address, receipt2.events[0].args[2].toNumber());
+        const loanID3 = await LoanPoolToken.connect(address1).getCollateralLoanId(gameItem.address, receipt3.events[0].args[2].toNumber());
+        console.log("loanID",loanID1,loanID2, loanID3)
+        console.log("healthFactor",await StabilityPoolToken.connect(address1).healthFactor(await address1.getAddress()))
+        await StabilityPoolToken.connect(address1).extraction(await address1.getAddress(), "1200000000000000000000");
+
 
         console.log("nftusd balance of address1: ",await NFTUSDToken.balanceOf(await address1.getAddress()))
         console.log("nftusd balance of StabilityPoolToken: ",await NFTUSDToken.balanceOf(StabilityPoolToken.address))
@@ -104,24 +123,43 @@ describe("StabilityPool", function () {
         console.log("NFTUSD total deposit: ",await StabilityPoolToken.getTotalNFTUSDDeposits())
 
         const debt = await StabilityPoolToken.healthFactor(await address1.getAddress())
-        console.log("debt: ",debt);
-        //repay NFTUSD
-        await StabilityPoolToken.connect(address1).repay(await address1.getAddress(),19999);
+        console.log("address1 debt: ",debt);
+
+        const debt3 = await  StabilityPoolToken.healthFactor(await address2.getAddress())
+        console.log("address3 debt: ",debt3);
+
+
+
+
+        // //repay NFTUSD
+        // await StabilityPoolToken.connect(address1).repay(await address1.getAddress(),19999);
+
 
 
         //redeemNFT
+       const txRedeem1 = await StabilityPoolToken.connect(address1).redeemNFT(gameItem.address, receipt1.events[0].args[2].toNumber(), "1000000000000000000000");
+       await txRedeem1.wait();
+       const ownerOf = await gameItem.ownerOf(receipt3.events[0].args[2].toNumber());
+        const balance1 = await NFTUSDToken.balanceOf(await address1.getAddress());
+        const balance2 = await NFTUSDToken.balanceOf(await address2.getAddress());
+        console.log("address1 balance ",balance1.toString());
+        console.log("address2 balance ",balance2.toString());
+        console.log("nft1 ownerOf: " + ownerOf);
+        console.log("unlock successfully")
         await StabilityPoolToken.connect(address2).redeemNFT(gameItem.address, receipt1.events[0].args[2].toNumber(),0);
-
+        const ownerof3 = await gameItem.ownerOf(receipt3.events[0].args[2].toNumber());
+        console.log("nft3 ownerOf: " + ownerof3);
+        console.log("unlock successfully")
 
         const debt2 = await StabilityPoolToken.healthFactor(await address1.getAddress())
         console.log("debt after repay: ",debt2);
 
 
 
-        const ownerOf = await gameItem.ownerOf(receipt1.events[0].args[2].toNumber());
-        console.log("nft1 ownerOf: " + ownerOf);
+
         const ownerof2 = await gameItem.ownerOf(receipt2.events[0].args[2].toNumber());
         console.log("nft2 ownerOf: " + ownerof2);
+
         console.log(await address1.getAddress());
         console.log("nftusd balance of address1: ",await NFTUSDToken.balanceOf(await address1.getAddress()))
         // const loanids = await StabilityPoolToken.getLoanIds(await address1.getAddress())

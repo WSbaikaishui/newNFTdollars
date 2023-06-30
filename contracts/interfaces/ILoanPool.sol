@@ -20,7 +20,6 @@ interface ILoanPool {
     address nftAsset,
     string nftName,
     uint256 nftTokenId
-
   );
 
 
@@ -49,7 +48,6 @@ interface ILoanPool {
     address nftAsset,
     string nftName,
     uint256 nftTokenId
-
   );
 
   event BorrowAmountUpdated(
