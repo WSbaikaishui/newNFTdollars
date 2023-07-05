@@ -10,31 +10,37 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "../interfaces/INDLToken.sol";
 
 contract NDLToken is
-INDLToken,
   Initializable,
   ERC20Upgradeable,
   OwnableUpgradeable,
   ERC20PermitUpgradeable,
-  ERC20VotesUpgradeable
+  ERC20VotesUpgradeable,
+  INDLToken
 {
   address private _pool;
-  constructor()  {}
+  uint private _deploymentStartTime;
+  constructor()  {
+  }
 
-  function initialize() public initializer {
+  function initialize(address lockup) public initializer {
     __ERC20_init("NDLToken", "NDL");
     __ERC20Permit_init("NDLToken");
-
     __Ownable_init();
-    _mint(msg.sender, 1000000000 * 10 ** decimals());
+    _mint(lockup, 25000000*10 ** decimals());
+    _mint(msg.sender, 75000000* 10 ** decimals());
   }
 
 
   //function initialize pool;
   function initializePool(address pool) public onlyOwner {
+
     _pool = pool;
     renounceOwnership();
   }
 
+  function getDeploymentStartTime() external view override returns (uint256){
+    return _deploymentStartTime;
+  }
   //modify only pool
   modifier onlyPool() {
     require(_pool == msg.sender, "Ownable: caller is not the pool");
@@ -56,9 +62,9 @@ INDLToken,
     super._burn(account, amount);
   }
 
-  function mint(address to, uint256 amount) public onlyPool {
-    _mint(to, amount);
-  }
+//  function mint(address to, uint256 amount) public onlyPool {
+//    _mint(to, amount);
+//  }
 
   function sendNDLToPool(address _sender, uint256 _amount) external onlyPool{
     _transfer(_sender, _pool, _amount);

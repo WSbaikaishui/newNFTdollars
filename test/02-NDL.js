@@ -16,7 +16,7 @@ describe("NDL", function () {
         await hardhatToken.deployed();
         console.log("this contract address is: " + hardhatToken.address);
         //initialize
-        await hardhatToken.connect( owner).initialize();
+        await hardhatToken.connect( owner).initialize(await owner.getAddress());
         const ndlName = await hardhatToken.name()
         console.log("initialize success: " + ndlName);
 

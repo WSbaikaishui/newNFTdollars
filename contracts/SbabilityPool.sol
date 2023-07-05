@@ -39,7 +39,6 @@ import "./utils/Errors.sol";
 contract StabilityPool is
     Initializable,
     ContextUpgradeable,
-    IERC721ReceiverUpgradeable,
     Ownable
     {
 
@@ -112,15 +111,18 @@ contract StabilityPool is
     /* ========== EVENTS ========== */
 
     event RewardAdded(uint8 types,uint256 reward);
+    event ExtraRewardAdd(uint256 reward)    ;
     event Staked(address indexed user, uint8 types,uint256 amount);
     event Withdrawn(address indexed user,uint8 types, uint256 amount);
-    event RewardPaid(address indexed user, address indexed rewardsToken, uint256 reward);
-    event RewardsDurationUpdated(address token, uint256 newDuration);
+    event RewardPaid(address indexed user, address indexed rewardsToken, uint8 types, uint256 reward);
+    event ExtraRewardPaid(address indexed user,  address indexed rewardsToken, uint256 reward);
+    event RewardsDurationUpdated(address token, uint8 types, uint256 newDuration);
 
 
     event Recovered(address token, uint256 amount);
     event Extraction(address indexed initiator, address indexed onBehalfOf, uint256 extractionAmount);
     event Repay(address indexed initiator, address indexed borrower, uint256 payAmount);
+    event RedeemNFT(address indexed initiator, address indexed borrower,address indexed nftAsset, uint256 tokenId);
     
         /**
        * @dev Function is invoked by the proxy contract when the LendPool contract is added to the
@@ -219,6 +221,7 @@ contract StabilityPool is
         require(onBehalfOf != address(0), "Errors.VL_INVALID_ONBEHALFOF_ADDRESS");
         require(amount > 0, "Errors.VL_INVALID_AMOUNT");
         require(!isLiquidate(msg.sender), "Errors.VL_INVALID_LIQUIDATE");
+
         DataTypes.ExtractionData memory eData;
         eData.borrower = msg.sender;
         (eData.accountDebt,eData.securityDeposit, eData.maxDebt) = healthFactor(eData.borrower);
@@ -237,13 +240,12 @@ contract StabilityPool is
         //mint NFTUSD to contract and mint NFTUSD to onBehalfOf
         nftusdToken.mint(address(this), eData.securityDeposit);
         nftusdToken.mint(onBehalfOf, eData.amount.sub(eData.securityDeposit) );
-
      //the extraction fee is sent to  pool ,this is the reward for the pool
         ndlToken.sendNDLToPool(eData.borrower,eData.extractionFee);
         totalNDLEarned = totalNDLEarned.add(eData.extractionFee);
 
-        poolLoan.updateBorrowAmount(eData.borrower,eData.amount, true);
-        poolLoan.updateSecurityDeposit(eData.borrower,eData.securityDeposit, true);
+
+        _updateAMountAndDeposit(eData.borrower, eData.amount, eData.securityDeposit, true, true);
         emit Extraction(eData.borrower, onBehalfOf, eData.amount);
 
     }
@@ -275,8 +277,7 @@ contract StabilityPool is
 
         totalNDLEarned = totalNDLEarned.add(amount.percentMul(redemptionFee));
         //update the borrow amount
-        poolLoan.updateBorrowAmount(onBehalfOf,amount, false);
-        poolLoan.updateSecurityDeposit(onBehalfOf,amount.percentMul(percentSecurityDeposit), false);
+        _updateAMountAndDeposit(onBehalfOf, amount, amount.percentMul(percentSecurityDeposit), false, false);
 
        emit Repay(initiator,  onBehalfOf, amount);
 
@@ -295,7 +296,7 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
     address initiator = msg.sender;
     uint8 nftType = nftOracle.getAssetType(nftAsset);
     DataTypes.LoanData memory loanData = poolLoan.getLoan(loanId);
-    (uint256 debt, , uint256 maxDebt) = healthFactor(loanData.borrower);
+    (uint256 debt, , uint256 maxDebt) = _getUserDebtMessage(loanData.borrower);
 
     //if the initiator is the borrower,then the initiator can redeem the nft
     if (loanData.borrower == initiator){
@@ -312,7 +313,6 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
         if (amount > nftusdToken.balanceOf(initiator)){
             amount = nftusdToken.balanceOf(initiator);
         }
-        require(amount >= price ,"amount is lower than this NFT");
         if (amount <price){
             revert NotEnoughAmount(amount, price);
         }else if (nftType == 0 && loanData.isUpLayer || nftType == 1){
@@ -344,8 +344,8 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
     function _repay(address initiator, address borrower, uint256 payAmount ) internal {
         nftusdToken.burn(initiator, payAmount.percentMul(percentBorrow));
         nftusdToken.burn(address(this), payAmount.percentMul(percentSecurityDeposit));
-        poolLoan.updateBorrowAmount(initiator, payAmount, false);
-        poolLoan.updateSecurityDeposit(initiator, payAmount.percentMul(percentSecurityDeposit), false);
+        _updateAMountAndDeposit(initiator,payAmount,payAmount.percentMul(percentSecurityDeposit),false,false);
+
 
         totalSecurityDeposit = totalSecurityDeposit.sub(payAmount.percentMul(percentSecurityDeposit));
 
@@ -365,7 +365,7 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
     //然后根据清算人的资金情况，分两种情况，一种是资金充裕，一种是资金不充裕
 
     function liquidate(address borrower,address nftAsset, uint256 nftTokenId,uint256 amount, bool isUpLayer, uint256 threshold) external updateExtraReward(address(0)) {
-        require(!isLiquidate(borrower),"this user is not liquidatable");
+        require(!isLiquidate(borrower), "The borrower is liquidated");
         DataTypes.LiquityData memory lData;
         (lData.borrowDebt, lData.borrowSecurityDeposit, lData.borrowMaxDebt) = _getUserDebtMessage(borrower);
         lData.liquityAddress = msg.sender;
@@ -376,7 +376,8 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
 
         //判断用户的钱够不够
         lData.userBalance = nftusdToken.balanceOf(lData.liquityAddress);
-        require(lData.userBalance > _isEnoughToken(lData.borrowMaxDebt, lData.borrowDebt,lData.borrowSecurityDeposit, lData.price),"user balance is not enough");
+        require(lData.userBalance <= _isEnoughToken(lData.borrowMaxDebt, lData.borrowDebt,lData.borrowSecurityDeposit, lData.price), "The user's balance is not enough");
+
         //给被清算人消债，也分两种情况，一种是debt > totalLock, 一种是debt < totalLock
         //第一种情况是常规情况，
         //第二种情况的清算方式，其实区别就在于decreaseSecurityDeposit的算法上
@@ -405,8 +406,7 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
             lData.userIncreaseAmount = lData.price;
             lData.userIncreaseSecurityDeposit = lData.price.percentMul(percentSecurityDeposit);
             //把借的钱还给池子，钱从哪里来，就从nft重新存来再借
-            poolLoan.updateBorrowAmount(lData.liquityAddress, lData.userIncreaseAmount, true);
-            poolLoan.updateSecurityDeposit(lData.liquityAddress, lData.userIncreaseSecurityDeposit, true);
+            _updateAMountAndDeposit(lData.liquityAddress, lData.userIncreaseAmount, lData.userIncreaseSecurityDeposit,true,true);
 //            nftusd.burn(lData.liquityAddress, lData.userBalance);
             nftusdToken.mint(lData.liquityAddress, lData.userIncreaseAmount.percentMul(percentBorrow).sub(lData.price - nftDepositNow - lData.userBalance));
             ndlToken.sendNDLToPool(lData.liquityAddress, stabilityPoolReward);
@@ -427,17 +427,26 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
     }
 
 
+    function _updateAMountAndDeposit(address user, uint256 amount, uint256 sd, bool amountAdd, bool sdAdd) internal {
+        poolLoan.updateBorrowAmount(user, amount, amountAdd);
+        poolLoan.updateSecurityDeposit(user, sd, sdAdd);
+
+
+    }
+
     function _isEnoughToken(uint256 maxDebt, uint256 accountDebt,uint256 security_deposit, uint256 nftPrice) internal view returns (uint256){
-       uint256 decreaseDeposit = security_deposit -accountDebt + maxDebt;
-        require(decreaseDeposit > 0,"decreaseDeposit is not enough to cover this debt");
-         uint256 minTokenUsed = nftPrice.percentMul(percentSecurityDeposit) - decreaseDeposit.mul(nftPrice).div(maxDebt);
+        require(security_deposit  + maxDebt >= accountDebt, "Not enough security deposit");
+        uint256 decreaseDeposit = security_deposit -accountDebt + maxDebt;
+        uint256 minTokenUsed = nftPrice.percentMul(percentSecurityDeposit) - decreaseDeposit.mul(nftPrice).div(maxDebt);
         return minTokenUsed;
     }
 
 
 //    是不是admin其实就一个区别，就是通过pool去拿钱
-//    function LiquidateLoanByAdmin(address liquidityAddress,address borrower,address nftAsset, uint256 nftTokenId,uint256 amount ) external  OnlyAdmin{
-//        require(!isLiquidate(borrower),"this user is not liquidatable");
+//    function LiquidateLoanByAdmin(address liquidityAddress,address borrower,address nftAsset, uint256 nftTokenId,uint256 amount ) external  onlyOwner{
+//        if (isLiquidate(borrower)){
+//            revert IsNotLiquidity(borrower);
+//        }
 //        DataTypes.LiquityData memory lData;
 //        (lData.borrowDebt, lData.borrowSecurityDeposit, lData.borrowMaxDebt) = healthFactor(borrower);
 //        lData.liquityAddress = liquidityAddress;
@@ -466,27 +475,23 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
 //        }
 //        poolLoan.liquidateLoan(loan.borrower, lData.liquityAddress, loan.loanId, false);
 //        string memory nftName = nftOracle.getAssetName(nftAsset);
-//        poolLoan.createLoan(lData.liquityAddress, nftAsset, nftTokenId, nftName, isUpLayer, threshold, false);
+//        poolLoan.createLoan(lData.liquityAddress, nftAsset, nftTokenId, nftName, false, 0, false);
 //        uint256 burnAmount;
 //        burnAmount= _isEnoughToken(lData.borrowMaxDebt, lData.borrowDebt ,lData.borrowSecurityDeposit, lData.price);
 //        _layerUserBalance[nftType][lData.liquityAddress] = _layerUserBalance[nftType][lData.liquityAddress].sub(burnAmount);
 //        lData.userIncreaseAmount = lData.price;
 //        lData.userIncreaseSecurityDeposit = lData.price.percentMul(percentSecurityDeposit);
 //        //把借的钱还给池子，钱从哪里来，就从nft重新存来再借
-//        poolLoan.updateBorrowAmount(lData.liquityAddress, lData.userIncreaseAmount, true);
-//        poolLoan.updateSecurityDeposit(lData.liquityAddress, lData.userIncreaseSecurityDeposit, true);
+//        _updateAMountAndDeposit(lData.liquityAddress, lData.price, lData.price.percentMul(percentSecurityDeposit), true, true);
 //        nftusdToken.burn(address(this), burnAmount);
-//        nftusdToken.mint(lData.liquityAddress, lData.userIncreaseAmount.percentMul(percentBorrow).sub(lData.price - nftDepositNow - lData.userBalance));
+//        nftusdToken.mint(lData.liquityAddress, lData.price.percentMul(percentSecurityDeposit).percentMul(percentBorrow).sub(lData.price - nftDepositNow - lData.userBalance));
 //
 //    }
 
     function _liquidate(address initiator, uint256 borrowAmount, uint256 securityDeposit) internal {
-        poolLoan.updateBorrowAmount(initiator,borrowAmount,false);
-        poolLoan.updateSecurityDeposit(initiator,securityDeposit,false);
+        _updateAMountAndDeposit(initiator, borrowAmount, securityDeposit, false, false);
         totalSecurityDeposit = totalSecurityDeposit - securityDeposit;
     }
-
-
 
 
     function isLiquidate(address user) public view returns (bool) {
@@ -508,8 +513,6 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
     function getTotalExtractionFee() external view returns (uint256) {
         return totalExtractionFee;
     }
-
-
 
     function healthFactor(address user) public view  returns (uint256 accountDebt,uint256 securityDeposit, uint256 totalNFTLocked){
         uint256[] memory loanIds = poolLoan.getLoanIds(user);
@@ -552,7 +555,6 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
         return _layerThreshold[types];
     }
 
-
     function getLoanIds(address user) external view returns (uint256[] memory) {
         return poolLoan.getLoanIds(user);
     }
@@ -562,7 +564,6 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
     }
 
     function getAllLoanMessage(address user) external view returns (DataTypes.LoanData[] memory loanData) {
-
         uint256[] memory  loanIds = poolLoan.getLoanIds(user);
         loanData = new DataTypes.LoanData[](loanIds.length);
         for (uint256 i = 0; i < loanIds.length; i++) {
@@ -571,35 +572,11 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
         return loanData;
     }
 
-    function onERC721Received(
-        address operator,
-        address from,
-        uint256 tokenId,
-        bytes calldata data
-    ) external pure override returns (bytes4) {
-        operator;
-        from;
-        tokenId;
-        data;
-        return IERC721ReceiverUpgradeable.onERC721Received.selector;
-    }
-
-
-
-    function _requireUserHasDeposit(uint _initialDeposit) internal pure {
-        require(_initialDeposit > 0, 'StabilityPool: User must have a non-zero deposit');
-    }
-
     function _requireNonZeroAmount(uint _amount) internal pure {
-        require(_amount > 0, 'StabilityPool: Amount must be non-zero');
+        if (_amount <= 0) {
+            revert AmountMustGreaterThanZero(_amount);
+        }
     }
-
-    function _requireUserHasNoDeposit(address _address) internal view {
-        uint initialDeposit = _balances[_address];
-        require(initialDeposit == 0, 'StabilityPool: User must have no deposit');
-    }
-
-
 
     function getReward(uint8 types) public  updateReward(types,msg.sender) {
 
@@ -609,7 +586,7 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
             if (reward > 0) {
                 layerRewards[types][msg.sender][_rewardsToken] = 0;
                 IERC20Upgradeable(_rewardsToken).transfer(msg.sender, reward);
-                emit RewardPaid(msg.sender, _rewardsToken, reward);
+                emit RewardPaid(msg.sender, _rewardsToken, types, reward);
             }
         }
     }
@@ -631,15 +608,14 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
 
 
     function setRewardsDuration(uint8 types, address _rewardsToken, uint256 _rewardsDuration) external {
-        require(
-            block.timestamp > _layerRewardData[types][_rewardsToken].periodFinish,
-            "Reward period still active"
-        );
-//        require(rewardData[_rewardsToken].rewardsDistributor == msg.sender);
+
+        if (block.timestamp <= _layerRewardData[types][_rewardsToken].periodFinish){
+            revert RewardPeriodNotFinish(block.timestamp, _layerRewardData[types][_rewardsToken].periodFinish);
+        }
+//        require(_layerRewardData[types][_rewardsToken].rewardsDistributor == msg.sender);
         require(_rewardsDuration > 0, "Reward duration must be non-zero");
-        //rewardData[_rewardsToken].rewardsDuration = _rewardsDuration;
         _layerRewardData[types][_rewardsToken].rewardsDuration = _rewardsDuration;
-        emit RewardsDurationUpdated(_rewardsToken, rewardData[_rewardsToken].rewardsDuration);
+        emit RewardsDurationUpdated(_rewardsToken, types, rewardData[_rewardsToken].rewardsDuration);
     }
 
 
@@ -687,9 +663,7 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
     }
 
     function earned(uint8 types, address account, address _rewardsToken) public view returns (uint256) {
-        //_la
-       return _layerUserBalance[types][account].mul(rewardPerToken(types,_rewardsToken).sub(layerUserRewardPerTokenPaid[types][account][_rewardsToken])).div(1e18).add(layerRewards[types][account][_rewardsToken]);
-//        return _balances[account].mul(rewardPerToken(_rewardsToken).sub(userRewardPerTokenPaid[account][_rewardsToken])).div(1e18).add(rewards[account][_rewardsToken]);
+        return _layerUserBalance[types][account].mul(rewardPerToken(types,_rewardsToken).sub(layerUserRewardPerTokenPaid[types][account][_rewardsToken])).div(1e18).add(layerRewards[types][account][_rewardsToken]);
     }
 
 
@@ -737,7 +711,7 @@ function redeemNFT(address nftAsset, uint256 nftTokenId,uint256 amount)  public 
             if (reward > 0) {
                 rewards[msg.sender][_rewardsToken] = 0;
                 IERC20Upgradeable(_rewardsToken).transfer(msg.sender, reward);
-                emit RewardPaid(msg.sender, _rewardsToken, reward);
+                emit ExtraRewardPaid(msg.sender, _rewardsToken, reward);
             }
         }
     }

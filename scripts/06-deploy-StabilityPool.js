@@ -26,6 +26,14 @@ async function main() {
     addressList["NDLToken"] = ndl.address;
     console.log("NDLToken deployed to:", ndl.address)
 
+    const LockUpContract = await ethers.getContractFactory("LockupContract")
+    console.log("Deploying LockUpContract...")
+    const lockup = await LockUpContract.deploy( addressList["NDLToken"], "0x40ebF7a33f8FAb287B9616F54d45fC6371c6f162",45818*52*2)
+    await lockup.deployed()
+    addressList["LockupContract"] = lockup.address;
+    console.log("LockUpContract deployed to:", lockup.address)
+
+
     const nftOracle = await ethers.getContractFactory("NFTOracle")
     console.log("Deploying NFTOracle...")
     const nftoracle = await nftOracle.deploy()
